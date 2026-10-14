@@ -8,3 +8,4 @@ tools/_out/
 # 실제 업무 데이터는 올리지 마세요
 *.xlsm
 dl/
+!TRACE_v0.5.xlsm
