@@ -13,7 +13,7 @@ Private Const FIRST_ROW As Long = 5
 Public Sub FillAllHelpers()
     Application.ScreenUpdating = False
     Application.Calculation = xlCalculationManual
-    FillHelpers UHex("C804D45C005FC6D0BCF8"), 13, 33
+    FillHelpers UHex("C804D45C005FC6D0BCF8"), 13, 34
     FillHelpers UHex("00540042005FC6D0BCF8"), 9, 11
     FillHelpers UHex("C608C0B0D310005FC6D0BCF8"), 12, 18
     FillHelpers UHex("00420053005FC6D0BCF8"), 9, 11
@@ -49,14 +49,15 @@ Public Sub ExportDashboard()
 
     js = "window.TRACE_DATA = {" & vbLf
     js = js & """meta"": " & MetaJson() & "," & vbLf
-    js = js & """kpi"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 87, 8, Array("label", "value", "compare", "rate", "basis")) & "," & vbLf
+    js = js & """kpi"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 91, 8, Array("label", "value", "compare", "rate", "basis")) & "," & vbLf
     js = js & """monthly"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 5, 12, Array("month", "cur", "prev", "budget")) & "," & vbLf
     js = js & """depts"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 20, 10, Array("code", "name", "avail", "ytd", "forecast", "rate", "status")) & "," & vbLf
     js = js & """status"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 31, 5, Array("status", "count")) & "," & vbLf
-    js = js & """accounts"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 38, 18, Array("gl", "name", "cur", "prevYear", "diff", "prevMonth", "qCur", "qPrev", "ytd", "ytdPrev")) & "," & vbLf
-    js = js & """bs"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 57, 12, Array("p", "period", "assets", "liabilities", "equity", "csm", "invested")) & "," & vbLf
-    js = js & """pl"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 72, 12, Array("month", "niCur", "niPrev", "insCur", "invCur", "expCur", "insPrev")) & "," & vbLf
-    js = js & """burn"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 97, 16, Array("rank", "dept", "account", "budget", "ytd", "slope", "icpt", "yearEnd", "tstar", "date", "status", "qdate", _
+    js = js & """accounts"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 38, 19, Array("gl", "name", "cur", "prevYear", "diff", "prevMonth", "qCur", "qPrev", "ytd", "ytdPrev")) & "," & vbLf
+    js = js & """bs"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 61, 12, Array("p", "period", "assets", "liabilities", "equity", "csm", "invested")) & "," & vbLf
+    js = js & """pl"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 76, 12, Array("month", "niCur", "niPrev", "insCur", "invCur", "expCur", "insPrev")) & "," & vbLf
+    js = js & """expcat"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 120, 8, Array("cat", "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12", "ytd", "share", "py", "diff", "rate")) & "," & vbLf
+    js = js & """burn"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 101, 16, Array("rank", "dept", "account", "budget", "ytd", "slope", "icpt", "yearEnd", "tstar", "date", "status", "qdate", _
         "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12", "row", "qlim", "qact", "pySlope")) & "," & vbLf
     js = js & """ifrs17"": " & Ifrs17Json() & "," & vbLf
 
@@ -124,7 +125,7 @@ Private Function MetaJson() As String
         ", ""period"": " & JV(CStr(st.Range("C6").Value) & "-" & Format(st.Range("C7").Value, "00")) & _
         ", ""unit"": " & JV(st.Range("C9").Value) & ", ""burnMethod"": " & JV(st.Range("C19").Value) & _
         ", ""check"": " & JV(ThisWorkbook.Worksheets(UHex("C790AC00C9C4B2E8")).Range("B4").Value) & _
-        ", ""recon"": " & JV(ThisWorkbook.Worksheets(UHex("ACC4C815BCC0B3D9")).Range("P24").Value) & _
+        ", ""recon"": " & JV(ThisWorkbook.Worksheets(UHex("ACC4C815BCC0B3D9")).Range("P25").Value) & _
         ", ""generated"": " & JV(Format(Now, "yyyy-mm-dd hh:nn")) & "}"
 End Function
 
@@ -293,7 +294,7 @@ Public Sub ImportTB()
     ImportSource UHex("00540042005FC6D0BCF8"), 23, 7, 3, 9, 11
 End Sub
 Public Sub ImportJournal()
-    ImportSource UHex("C804D45C005FC6D0BCF8"), 34, 11, 6, 13, 33
+    ImportSource UHex("C804D45C005FC6D0BCF8"), 34, 11, 6, 13, 34
 End Sub
 Public Sub ImportBS()
     If InStr(CStr(ThisWorkbook.Worksheets(UHex("C785B825C635C158")).Range("C13").Value), UHex("AC10B3C5C6D0")) > 0 Then
