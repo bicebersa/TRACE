@@ -210,16 +210,53 @@ Private Sub SaveJsonSheet(ByVal js As String)
     ws.Visible = xlSheetHidden
 End Sub
 
+' UTF-8(BOM 없음)로 저장. ADODB 없이 직접 바이트를 만들어 윈도우·맥 모두 동작합니다.
 Private Sub WriteUtf8(ByVal path As String, ByVal text As String)
-    Dim st As Object
-    Set st = CreateObject("ADODB.Stream")
-    st.Type = 2
-    st.Charset = "utf-8"
-    st.Open
-    st.WriteText text
-    st.SaveToFile path, 2
-    st.Close
+    Dim b() As Byte, i As Long, n As Long, c As Long, lo As Long, f As Integer
+    If Len(text) = 0 Then text = " "
+    ReDim b(0 To Len(text) * 4)
+    For i = 1 To Len(text)
+        c = AscW(Mid$(text, i, 1)) And &HFFFF&
+        If c >= &HD800& And c <= &HDBFF& And i < Len(text) Then
+            lo = AscW(Mid$(text, i + 1, 1)) And &HFFFF&
+            If lo >= &HDC00& And lo <= &HDFFF& Then c = &H10000 + (c - &HD800&) * &H400& + (lo - &HDC00&): i = i + 1
+        End If
+        If c < &H80& Then
+            b(n) = c: n = n + 1
+        ElseIf c < &H800& Then
+            b(n) = &HC0& Or (c \ &H40&): b(n + 1) = &H80& Or (c And &H3F&): n = n + 2
+        ElseIf c < &H10000 Then
+            b(n) = &HE0& Or (c \ &H1000&): b(n + 1) = &H80& Or ((c \ &H40&) And &H3F&): b(n + 2) = &H80& Or (c And &H3F&): n = n + 3
+        Else
+            b(n) = &HF0& Or (c \ &H40000): b(n + 1) = &H80& Or ((c \ &H1000&) And &H3F&)
+            b(n + 2) = &H80& Or ((c \ &H40&) And &H3F&): b(n + 3) = &H80& Or (c And &H3F&): n = n + 4
+        End If
+    Next i
+    ReDim Preserve b(0 To n - 1)
+    If Len(Dir(path)) > 0 Then Kill path
+    f = FreeFile
+    Open path For Binary Access Write As #f
+    Put #f, , b
+    Close #f
 End Sub
+
+' 파일 선택 창. 맥은 윈도우식 형식 필터를 받지 않아 필터 없이 엽니다.
+Private Function PickFile(ByVal filt As String, ByVal caption As String) As Variant
+    #If Mac Then
+        PickFile = Application.GetOpenFilename()
+    #Else
+        PickFile = Application.GetOpenFilename(filt, , caption)
+    #End If
+End Function
+
+' 한글 문자열 복원: 소스에는 유니코드 값(16진수 4자리씩)으로 넣어, 파일 인코딩이 깨져도(맥 VBA 편집기 등) 동작하게 합니다.
+Private Function UHex(ByVal h As String) As String
+    Dim i As Long, s As String
+    For i = 1 To Len(h) Step 4
+        s = s & ChrW(CLng("&H" & Mid$(h, i, 4)))
+    Next i
+    UHex = s
+End Function
 
 ' ---------------------------------------------------------------- 불러오기 (헤더설정 시트의 헤더 이름으로 열을 찾음)
 Public Sub ImportBudget()
@@ -270,7 +307,7 @@ Private Sub ImportSource(ByVal sheetName As String, ByVal mapRow0 As Long, ByVal
     shMode = (sheetName = "전표_원본" And CStr(op.Range("C8").Value) = "차대구분+양수금액")
     creditVal = UCase$(Trim$(CStr(op.Range("C11").Value)))
 
-    f = Application.GetOpenFilename("Excel/CSV 파일 (*.xlsx;*.xlsm;*.xls;*.csv),*.xlsx;*.xlsm;*.xls;*.csv", , sheetName & " - SAP에서 내려받은 파일 선택")
+    f = PickFile("Excel/CSV 파일 (*.xlsx;*.xlsm;*.xls;*.csv),*.xlsx;*.xlsm;*.xls;*.csv", sheetName & " - SAP에서 내려받은 파일 선택")
     If VarType(f) = vbBoolean Then Exit Sub
     Application.ScreenUpdating = False
     Set src = Workbooks.Open(Filename:=CStr(f), ReadOnly:=True, UpdateLinks:=0)
@@ -423,7 +460,7 @@ Private Sub ImportWide(ByVal sheetName As String, ByVal mapRow0 As Long, ByVal h
     y = st.Range("C6").Value: m = st.Range("C7").Value
     If CStr(op.Range("C17").Value) = "전년동월" Then py = y - 1: pm = m Else py = y - 1: pm = 12
     excl = Split(CStr(op.Range("C5").Value), ",")
-    f = Application.GetOpenFilename("Excel 파일 (*.xlsx;*.xlsm;*.xls),*.xlsx;*.xlsm;*.xls", , sheetName & " - 감독원 양식 (" & y & "년 " & m & "월)")
+    f = PickFile("Excel 파일 (*.xlsx;*.xlsm;*.xls),*.xlsx;*.xlsm;*.xls", sheetName & " - 감독원 양식 (" & y & "년 " & m & "월)")
     If VarType(f) = vbBoolean Then Exit Sub
     Application.ScreenUpdating = False
     Set src = Workbooks.Open(Filename:=CStr(f), ReadOnly:=True, UpdateLinks:=0)
@@ -568,6 +605,33 @@ rep = {"{CDG1}": CD["CDG"] + 1, "{NKPI}": CD["NKPI"], "{CDA1}": CD["CDA"] + 1, "
        "{CDC1}": CD["CDC"] + 1, "{CDD1}": CD["CDD"] + 1, "{NGL}": CD["NGL"], "{CDE1}": CD["CDE"] + 1, "{CDF1}": CD["CDF"] + 1, "{CDH1}": CD["CDH"] + 1, "{NBURN1}": CD["NBURN"] + 1, "{AT}": AT}
 for k, v in rep.items(): VBA = VBA.replace(k, str(v))
 assert "{" not in VBA.replace('"{', "").replace("{""", "") or True
+def kliteral(src):
+    """주석 밖의 한글이 든 "..." 문자열을 UHex("C124C815") 호출로 바꾼다."""
+    out = []
+    for line in src.split("\n"):
+        res, i, n = [], 0, len(line)
+        while i < n:
+            ch = line[i]
+            if ch == "'":
+                res.append(line[i:]); break
+            if ch == '"':
+                j = i + 1
+                while j < n:
+                    if line[j] == '"':
+                        if j + 1 < n and line[j + 1] == '"': j += 2; continue
+                        break
+                    j += 1
+                lit = line[i:j + 1]; body = lit[1:-1].replace('""', '"')
+                if any(ord(c) > 127 for c in body) and not line.lstrip().startswith("Attribute"):
+                    res.append('UHex("' + "".join(f"{ord(c):04X}" for c in body) + '")')
+                else:
+                    res.append(lit)
+                i = j + 1; continue
+            res.append(ch); i += 1
+        out.append("".join(res))
+    return "\n".join(out)
+VBA = kliteral(VBA)
+assert max(len(l) for l in VBA.split("\n")) < 1000, "VBA 한 줄이 너무 깁니다"
 VBA.encode("cp949")
 open(OUT, "w", encoding="cp949", newline="\r\n").write(VBA)
 print("wrote", OUT, len(VBA.splitlines()), "lines")
