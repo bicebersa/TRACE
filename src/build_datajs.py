@@ -65,7 +65,9 @@ for d, gl in KEYS:
     qst = "무예산" if qlim == 0 and qact > 0 else "-" if qlim == 0 else "한도 초과" if qact > qlim else "초과 예상" if qrate > 1 else "주의" if qrate > 0.9 else "여유"
     c4 = 25 if (W in ("부족 예상", "무예산") or qst in ("한도 초과", "초과 예상", "무예산")) else 15 if (W == "주의" or qst == "주의") else 0
     sc = round((c1 + c2 + c3 + c4) * (0.3 if F < 10 and N < 10 else 1), 1)
+    K, L = tot(k, QS, P), tot(k, QS - 3, P - 3); AX = tot(k, (Y - 1) * 12 + 1, P - 12)
     VA[k] = dict(d=d, gl=gl, F=F, G=G, I=I, H=rate(F, G), J=rate(F, I), P=avail, Q=Q, U=U, V=V, W=W, X=X, Y=Ym, Z=sig.strip(), AA=sc, mon=mon,
+                 K=K, L=L, M=rate(K, L), AX=AX, AY=rate(Q, AX),
                  AJ=qlim, AK=qact, AM=qfc, AN=qrate, AO=qst,
                  row=7 + KEYS.index((d, gl)))
 rank = sorted(VA, key=lambda k: VA[k]["AA"] + VA[k]["row"] / 1e6, reverse=True)[:10]
@@ -101,9 +103,10 @@ burnrows = [burnrow("전사", "전사", "사업비 합계", tav, tytd, burn(tcum
 for i, k in enumerate([k for k in sorted(VA, key=lambda k: VA[k]["AW"]) if VA[k]["AW"] < 99][:15], 1):
     v = VA[k]; burnrows.append(burnrow(i, DEPTS[v["d"]], GLN[v["gl"]], v["P"], v["Q"], v, v["cum"]))
 
-# ---------------- 원인분석 (비교 기준: 전월)
-def cause(k):
-    cs = ce = P; ps = pe = P - 1
+# ---------------- 원인분석 (비교 기준: 전월 · 전분기 · 전년동기누적 · 전년동월 — 원인분석 C10~C13과 같은 기간)
+PERIODS = {"전월": (P, P, P - 1, P - 1), "전분기": (QS, P, QS - 3, P - 3), "전년동기누적": (Y * 12 + 1, P, (Y - 1) * 12 + 1, P - 12), "전년동월": (P, P, P - 12, P - 12)}
+def cause(k, basis="전월"):
+    cs, ce, ps, pe = PERIODS[basis]
     cur = [e for e in E if e["key"] == k and cs <= e["p"] <= ce]; cmp_ = [e for e in E if e["key"] == k and ps <= e["p"] <= pe]
     A16, B16 = sum(e["v"] for e in cur), sum(e["v"] for e in cmp_); C16 = A16 - B16; D16 = rate(A16, B16)
     both = sorted(cur + cmp_, key=lambda e: e["row"]); names = []
@@ -169,11 +172,11 @@ def cause(k):
     cands = sorted([(sc * 10 + sh + (20 + i) / 1e6, nm, lv, txt) for i, (nm, lv, sc, yes, sh, txt) in enumerate(pats) if yes], reverse=True)
     top = cands[0][3] if cands else "근거 전표 목록을 직접 확인하세요"
     va = VA[k]
-    summ = (f"{DEPTS[va['d']]} · {GLN[va['gl']]} 전월 대비 {('+' if C16 > 0 else '') + t1(C16) if C16 != 0 else '0'} ({spct(D16)}). "
+    summ = (f"{DEPTS[va['d']]} · {GLN[va['gl']]} {basis} 대비 {('+' if C16 > 0 else '') + t1(C16) if C16 != 0 else '0'} ({spct(D16)}). "
             + ("감소 또는 변동 없음 - 원인 후보는 증가 항목에만 만듭니다. " if C16 <= 0 else top + ". ")
             + f"분기 한도: {va['AO']}" + (f", 연간 {t1(va['X'])} 부족 예상 ({va['Y']} 소진)" if va["X"] > 0 else "") + ".")
     ev = sorted(cur, key=lambda e: abs(e["v"]) + e["row"] / 1e9, reverse=True)[:15]
-    return dict(summary=summ, curTotal=A16, cmpTotal=B16, diff=C16,
+    return dict(basis=basis, summary=summ, curTotal=A16, cmpTotal=B16, diff=C16,
                 candidates=[dict(pattern=c[1], strength=c[2], text=c[3]) for c in cands] or [dict(pattern="뚜렷한 패턴 없음", strength=None, text="근거 전표 목록을 직접 확인하세요")],
                 vendors=[dict(name=x["name"], cur=x["cur"], cmp=x["cmp"], diff=x["diff"], share=(x["diff"] / C16 if C16 > 0 else None), isNew=x["new"]) for x in vs],
                 evidence=[dict(date=e["date"], doc=e["doc"], type=e["typ"], vendor=e["vname"], text=e["text"], amt=e["v"]) for e in ev])
@@ -181,8 +184,12 @@ def cause(k):
 top10 = []
 for i, k in enumerate(rank, 1):
     v = VA[k]
+    bw = dict(dept=DEPTS[v["d"]], account=GLN[v["gl"]], ytd=v["Q"], budget=v["P"], slope=v["slope"], icpt=v["icpt"], yearEnd=v["yearEnd"],
+              tstar=v["tstar"], date=v["date"], status=v["status"], qdate=v["qdate"]); bw.update({f"c{j + 1}": c for j, c in enumerate(v["cum"])})
     top10.append(dict(rank=i, dept=DEPTS[v["d"]], account=GLN[v["gl"]], cur=v["F"], mom=v["H"], yoy=v["J"], status=v["AO"], qrate=v["AN"],
-                      annual=v["W"], signal=v["Z"] or None, score=v["AA"], comment=COMMENTS.get(k, "(미확인)"), cause=cause(k)))
+                      annual=v["W"], signal=v["Z"] or None, score=v["AA"], comment=COMMENTS.get(k, "(미확인)"),
+                      qcur=v["K"], qoq=v["M"], ytd=v["Q"], ytdRate=v["AY"], burn=bw,
+                      cause=cause(k), causes={b: cause(k, b) for b in ("전분기", "전년동기누적")}))
 
 # ---------------- 차트데이터
 bs = {(r[0] * 12 + r[1], r[2]): r[6] / 1e6 for r in D["BS"]}
@@ -196,10 +203,10 @@ for dd, nm in DEPTS.items():
     r_ = u / a if a else 0
     depts.append(dict(code=dd, name=nm, avail=a, ytd=q, forecast=u, rate=r_, status="-" if a == 0 else "한도 초과" if q > a else "초과 예상" if r_ > 1 else "주의" if r_ > 0.9 else "여유"))
 status = [dict(status=s, count=sum(1 for v in VA.values() if v["AO"] == s)) for s in ["여유", "주의", "초과 예상", "한도 초과", "무예산"]]
-accounts = []
+accounts = []   # 전표 기준 (변동분석 행 합계) — 엑셀 차트데이터 계정별과 같음
 for gl, nm in GLN.items():
-    c = sum(e["v"] for e in E if e["gl"] == gl and e["p"] == P); py = sum(e["v"] for e in E if e["gl"] == gl and e["p"] == P - 12)
-    accounts.append(dict(gl=gl, name=nm, cur=c, prevYear=py, diff=c - py))
+    vs = [v for v in VA.values() if v["gl"] == gl]; sm = lambda f: sum(v[f] for v in vs)
+    accounts.append(dict(gl=gl, name=nm, cur=sm("F"), prevYear=sm("I"), diff=sm("F") - sm("I"), prevMonth=sm("G"), qCur=sm("K"), qPrev=sm("L"), ytd=sm("Q"), ytdPrev=sm("AX")))
 bsrows = [dict(p=p, period=plab(p), assets=bs[(p, "A000")], liabilities=bs[(p, "L000")], equity=bs[(p, "E000")], csm=bs[(p, "L130")], invested=bs[(p, "A100")]) for p in range(P - 11, P + 1)]
 plrows = [dict(month=f"{m}월", niCur=pl[(Y * 12 + m, "P600")][0] if m <= M else 0, niPrev=pl[((Y - 1) * 12 + m, "P600")][0],
                insCur=pl[(Y * 12 + m, "P100")][0] if m <= M else 0, invCur=pl[(Y * 12 + m, "P200")][0] if m <= M else 0,
@@ -213,6 +220,8 @@ kpi = [dict(label="총자산", value=bs[(P, "A000")], compare=bs[(P - 12, "A000"
        dict(label="당기순이익 누계", value=pl[(P, "P600")][1], compare=pl[(P - 12, "P600")][1], rate=kv(pl[(P, "P600")][1], pl[(P - 12, "P600")][1]), basis="전년 누계"),
        dict(label="사업비 누계", value=ytd, compare=pytd, rate=kv(ytd, pytd), basis="전년 누계"),
        dict(label="사업비 당월", value=mc, compare=mp, rate=kv(mc, mp), basis="전월"),
+       dict(label="사업비 당분기", value=sum(v["K"] for v in VA.values()), compare=sum(v["L"] for v in VA.values()),
+            rate=kv(sum(v["K"] for v in VA.values()), sum(v["L"] for v in VA.values())), basis="전분기"),
        dict(label="분기 한도 초과(예상)", value=status[2]["count"] + status[3]["count"], compare=status[1]["count"], rate=None, basis="주의 건수")]
 # ---------------- IFRS17 (GMM) 사업비 영향
 DIRECT = {"63501000": "신계약비", "63502000": "수금비", "62701000": "비귀속"}

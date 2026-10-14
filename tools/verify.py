@@ -58,7 +58,7 @@ def main():
         k = g("변동분석", f"E{r}")
         if k not in VA: continue
         x = VA[k]
-        for col, f in (("F", "F"), ("G", "G"), ("I", "I"), ("P", "P"), ("Q", "Q"), ("U", "U"), ("AA", "AA"), ("AJ", "AJ"), ("AM", "AM")):
+        for col, f in (("F", "F"), ("G", "G"), ("I", "I"), ("P", "P"), ("Q", "Q"), ("U", "U"), ("AA", "AA"), ("AJ", "AJ"), ("AM", "AM"), ("K", "K"), ("L", "L"), ("M", "M"), ("AX", "AX"), ("AY", "AY")):
             v = g("변동분석", f"{col}{r}")
             if not isinstance(v, float) or abs(v - x[f]) > 0.06: bad.append(f"변동분석 {k} {col}: {v} vs {x[f]}")
         for col, f in (("W", "W"), ("AO", "AO")):
@@ -72,6 +72,21 @@ def main():
             v = g("변동분석", f"{col}{r}")
             if (v or "") != x[f]: bad.append(f"변동분석 {k} {col}: {v} vs {x[f]}")
     CDL = json.load(open(os.path.join(SRC, "tool_data.json")))["CD"]
+    for i, t in enumerate(data["top10"]):   # 주의대상 누계 비교·고갈 추세 열
+        r = 6 + i
+        for col, v in (("O", t["qcur"]), ("P", t["qoq"]), ("Q", t["ytd"]), ("R", t["ytdRate"]), ("S", t["burn"]["budget"]), ("T", t["burn"]["slope"]), ("AL", t["burn"]["c12"]), ("AA", t["burn"]["c1"])):
+            x = g("주의대상", f"{col}{r}")
+            if not isinstance(x, float) or abs(x - v) > 0.06: bad.append(f"주의대상 {i + 1} {col}: {x} vs {v}")
+        for col, v in (("X", t["burn"]["date"]), ("Y", t["burn"]["status"]), ("Z", t["burn"]["qdate"])):
+            if (g("주의대상", f"{col}{r}") or "") != v: bad.append(f"주의대상 {i + 1} {col}: {g('주의대상', f'{col}{r}')} vs {v}")
+    for i, a in enumerate(data["accounts"]):   # 차트데이터 계정별 (전표 기준)
+        r = CDL["CDD"] + 1 + i
+        for col, f in (("C", "cur"), ("D", "prevYear"), ("F", "prevMonth"), ("G", "qCur"), ("H", "qPrev"), ("I", "ytd"), ("J", "ytdPrev")):
+            x = g("차트데이터", f"{col}{r}")
+            if not isinstance(x, float) or abs(x - a[f]) > 0.06: bad.append(f"차트데이터 계정 {a['gl']} {col}: {x} vs {a[f]}")
+    for i, kp in enumerate(data["kpi"]):
+        x = g("차트데이터", f"B{CDL['CDG'] + 1 + i}")
+        if not isinstance(x, float) or abs(x - kp["value"]) > 0.6: bad.append(f"KPI {kp['label']}: {x} vs {kp['value']}")
     for i, b in enumerate(G["burnrows"]):
         r = CDL["CDH"] + 1 + i
         for col, f in (("A", "rank"), ("B", "dept"), ("J", "date"), ("K", "status"), ("L", "qdate")):
@@ -83,7 +98,7 @@ def main():
     top_xl = [g("주의대상", f"L{r}") for r in range(6, 16)]
     top_py = [f"{VA[k]['d']}|{VA[k]['gl']}" for k in G["rank"]]
     if top_xl != top_py: bad.append(f"TOP10 {top_xl} vs {top_py}")
-    key = g("원인분석", "C9"); py = cause(key)
+    key = g("원인분석", "C9"); basis = g("원인분석", "C6"); py = cause(key, basis)
     xl_c = [g("원인분석", f"B{r}") for r in range(21, 29) if g("원인분석", f"B{r}")]
     if xl_c != [c["pattern"] for c in py["candidates"]]: bad.append(f"원인 패턴 {xl_c} vs {[c['pattern'] for c in py['candidates']]}")
     X = data["ifrs17"]; L = json.load(open(os.path.join(SRC, "tool_data.json")))["IF"]
