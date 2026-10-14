@@ -1,0 +1,537 @@
+<title>TRACE 사업비 원인추적기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 레이아웃: 위에서 아래로 읽는 설명서. 핵심은 7단계 파이프라인 + 단계별 상세(일반 로직 | 예시) 패널 */
+:root {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --ink: #16231f;
+  --muted: #5b6b66;
+  --line: #d5ddd9;
+  --accent: #17705a;
+  --accent-soft: #e1f0ea;
+  --warn: #9a6512;
+  --warn-soft: #fbf0dc;
+  --crit: #b4372f;
+  --crit-soft: #f8e2df;
+  --font-body: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #2a3833;
+    --accent: #4fbf9a; --accent-soft: #183128; --warn: #e0a84a; --warn-soft: #33281a;
+    --crit: #ef7a6e; --crit-soft: #3a1f1c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #2a3833;
+  --accent: #4fbf9a; --accent-soft: #183128; --warn: #e0a84a; --warn-soft: #33281a;
+  --crit: #ef7a6e; --crit-soft: #3a1f1c; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.65;
+  padding-inline: 16px; padding-block: 0;
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 40px 72px; display: grid; gap: 56px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.3; }
+h1 { font-size: clamp(26px, 4vw, 36px); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 21px; font-weight: 700; }
+h3 { font-size: 16px; font-weight: 700; }
+p { margin: 0; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.eyebrow { font-size: 12px; letter-spacing: 0.08em; color: var(--accent); font-weight: 500; text-transform: uppercase; }
+.muted { color: var(--muted); }
+section { display: grid; gap: 18px; }
+.section-head { display: grid; gap: 6px; max-width: 70ch; }
+
+/* 머리 */
+header.top { display: grid; gap: 14px; }
+header.top .lede { font-size: 17px; max-width: 62ch; color: var(--muted); }
+header.top .lede strong { color: var(--ink); font-weight: 500; }
+.formula {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  font-size: 14px; margin-top: 4px;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); background: var(--surface);
+  border-radius: 999px; padding: 4px 12px; white-space: nowrap;
+}
+.chip b { font-weight: 500; }
+.chip.out { background: var(--accent-soft); border-color: transparent; color: var(--ink); }
+.op { color: var(--muted); font-family: var(--font-mono); }
+.acro { font-family: var(--font-mono); font-size: 13px; color: var(--muted); letter-spacing: .02em; }
+.acro b { color: var(--accent); font-weight: 500; font-size: 15px; }
+.note { font-size: 12px; color: var(--muted); }
+
+/* 파이프라인 */
+.pipe-scroll { overflow-x: auto; padding-bottom: 4px; }
+.pipe {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(7, minmax(128px, 1fr)); gap: 0;
+  min-width: 900px; position: relative;
+}
+.pipe li { position: relative; padding-right: 22px; }
+.pipe li:last-child { padding-right: 0; }
+.pipe li:not(:last-child)::after {
+  content: ""; position: absolute; right: 6px; top: 34px;
+  width: 10px; height: 10px; border-top: 2px solid var(--line); border-right: 2px solid var(--line);
+  transform: rotate(45deg);
+}
+.stage {
+  width: 100%; height: 100%; text-align: left; cursor: pointer;
+  font: inherit; color: inherit;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 12px 12px 14px; display: grid; gap: 6px; align-content: start;
+  transition: border-color .15s, background .15s;
+}
+.stage:hover { border-color: var(--accent); }
+.stage:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stage[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 3px 0 var(--accent); }
+.stage .n { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+.stage .t { font-weight: 700; font-size: 15px; line-height: 1.35; }
+.stage .s { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.loop {
+  min-width: 900px; display: grid; grid-template-columns: repeat(7, 1fr); margin-top: 6px;
+}
+.loop span {
+  grid-column: 6 / 8; font-size: 12px; color: var(--muted);
+  border: 1px dashed var(--line); border-top: none; border-radius: 0 0 10px 10px;
+  padding: 6px 10px 4px; text-align: center; margin-right: 0;
+}
+@media (max-width: 760px) {
+  .pipe { grid-template-columns: 1fr; min-width: 0; gap: 14px; }
+  .pipe li { padding-right: 0; }
+  .pipe li:not(:last-child)::after { right: auto; left: 22px; top: auto; bottom: -12px; transform: rotate(135deg); }
+  .loop { min-width: 0; grid-template-columns: 1fr; }
+  .loop span { grid-column: 1; border-radius: 10px; border-top: 1px dashed var(--line); }
+}
+
+/* 상세 패널 */
+.panel {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.panel > div { padding: 22px 24px; display: grid; gap: 14px; align-content: start; min-width: 0; }
+.panel .ex { border-left: 1px solid var(--line); background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); border-radius: 0 var(--radius) var(--radius) 0; }
+@media (max-width: 760px) {
+  .panel { grid-template-columns: 1fr; }
+  .panel .ex { border-left: none; border-top: 1px solid var(--line); border-radius: 0 0 var(--radius) var(--radius); }
+}
+.panel-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.panel-title .n { font-family: var(--font-mono); color: var(--accent); font-size: 13px; }
+.panel ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.io { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 13.5px; }
+.io dt { color: var(--muted); }
+.io dd { margin: 0; }
+.nav { display: flex; gap: 8px; justify-content: space-between; align-items: center; margin-top: 4px; }
+.nav button {
+  font: inherit; font-size: 13px; cursor: pointer; color: var(--ink);
+  background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px;
+}
+.nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.nav button:disabled { opacity: .4; cursor: default; }
+.nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ex-label { font-size: 12px; color: var(--muted); }
+.ex-label b { color: var(--ink); font-weight: 500; }
+
+/* 예시 안의 요소 */
+.kv { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.kv th, .kv td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.kv th { font-weight: 500; color: var(--muted); font-size: 12px; }
+.kv td.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.kv tr:last-child td { border-bottom: none; }
+.tbl-scroll { overflow-x: auto; }
+.pill { display: inline-block; font-size: 12px; font-weight: 500; border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
+.pill.ok { background: var(--accent-soft); color: var(--accent); }
+.pill.warn { background: var(--warn-soft); color: var(--warn); }
+.pill.crit { background: var(--crit-soft); color: var(--crit); }
+.up { color: var(--crit); }
+.bar { height: 10px; border-radius: 6px; background: var(--line); position: relative; overflow: hidden; }
+.bar i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 6px; }
+.bar i.crit { background: var(--crit); }
+.bar .tick { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+.quote {
+  border-left: 3px solid var(--accent); padding: 8px 12px; background: var(--surface);
+  border-radius: 0 8px 8px 0; font-size: 14px;
+}
+.split { display: grid; gap: 6px; }
+.split .row { display: grid; grid-template-columns: minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 13px; }
+.split .row .lbl { display: grid; gap: 3px; min-width: 0; }
+.split .row .pct { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* 매트릭스 · 표 */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 0; }
+table.grid { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px; }
+table.grid th, table.grid td { padding: 11px 16px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+table.grid thead th { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: .02em; }
+table.grid tbody th { font-weight: 500; white-space: nowrap; }
+table.grid tr:last-child td, table.grid tr:last-child th { border-bottom: none; }
+.src { display: inline-block; font-size: 12.5px; border-radius: 6px; padding: 1px 8px; margin: 1px 4px 1px 0; border: 1px solid var(--line); white-space: nowrap; }
+.src.bp { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.src.tb { border-style: dashed; }
+.src.je { background: var(--accent-soft); border-color: transparent; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted); }
+
+/* 망분리 레인 */
+.lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.lane { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; display: grid; gap: 12px; align-content: start; }
+.lane h3 { display: flex; gap: 8px; align-items: center; }
+.lane ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; }
+.lane .tag { font-size: 12px; font-weight: 500; border-radius: 6px; padding: 1px 8px; background: var(--accent-soft); color: var(--accent); }
+.lane.in .tag { background: var(--warn-soft); color: var(--warn); }
+.handoff { font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
+.handoff b { color: var(--ink); font-weight: 500; }
+@media (max-width: 760px) { .lanes { grid-template-columns: 1fr; } }
+
+/* 로드맵 */
+.road { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 8px; align-content: start; }
+.step .when { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+.step.later { border-style: dashed; background: transparent; }
+.step.later .when { color: var(--muted); }
+.step ul { margin: 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 4px; }
+@media (max-width: 900px) { .road { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .road { grid-template-columns: 1fr; } }
+
+.checklist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; margin: 0; padding: 0; list-style: none; }
+.checklist li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; font-size: 14px; }
+.checklist li::before { content: ""; width: 14px; height: 14px; border: 1.5px solid var(--accent); border-radius: 3px; margin-top: 5px; }
+.checklist b { font-weight: 500; }
+@media (max-width: 640px) { .checklist { grid-template-columns: 1fr; } }
+
+footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="top">
+    <span class="eyebrow">사업비 변동 원인분석 및 예산 점검 자동화 · 프로젝트 흐름</span>
+    <h1>TRACE <span style="font-weight:500;color:var(--muted)">사업비 원인추적기</span></h1>
+    <p class="acro" aria-label="TRACE의 뜻"><b>T</b>rend 추이 · <b>R</b>isk 예산 위험 · <b>A</b>nomaly 이상치 · <b>C</b>ause 원인 · <b>E</b>xpense 사업비</p>
+    <p class="lede">SAP 예산판, TB, 전표 파일 세 개를 넣으면 <strong>어느 부서의 어떤 계정을 봐야 하는지</strong>, <strong>예산이 버틸지</strong>, <strong>무엇 때문에 늘었을 것 같은지</strong>를 근거 전표와 함께 보여주는 엑셀 도구입니다. 내부망의 Excel 2016 + VBA와 HTML만으로 돌아갑니다.</p>
+    <div class="formula" aria-label="입력과 출력">
+      <span class="chip"><b>예산판</b> 부서×계정×분기</span><span class="op">+</span>
+      <span class="chip"><b>TB</b> 계정×월</span><span class="op">+</span>
+      <span class="chip"><b>전표</b> 건별</span><span class="op">→</span>
+      <span class="chip out"><b>변동 · 예산 판정 · 주의 대상 · 원인 후보</b></span>
+    </div>
+  </header>
+
+  <section aria-labelledby="flow-h">
+    <div class="section-head">
+      <span class="eyebrow">처리 흐름</span>
+      <h2 id="flow-h">7단계로 처리합니다</h2>
+      <p class="muted">단계를 누르면 아래에 그 단계가 하는 일과, 예시 한 건(마케팅팀 광고선전비 9월)이 그 단계에서 어떻게 보이는지가 나옵니다.</p>
+    </div>
+    <div class="pipe-scroll">
+      <ol class="pipe" id="pipe"></ol>
+      <div class="loop" aria-hidden="true"><span>⑦에서 확인한 원인을 키워드 사전에 반영 → 다음 달 ⑥이 더 정확해짐</span></div>
+    </div>
+    <div class="panel" id="panel" aria-live="polite">
+      <div>
+        <div class="panel-title"><span class="n" id="p-n"></span><h3 id="p-t"></h3></div>
+        <ul id="p-does"></ul>
+        <dl class="io">
+          <dt>입력</dt><dd id="p-in"></dd>
+          <dt>출력</dt><dd id="p-out"></dd>
+        </dl>
+        <div class="nav">
+          <button type="button" id="prev">← 이전 단계</button>
+          <button type="button" id="next">다음 단계 →</button>
+        </div>
+      </div>
+      <div class="ex">
+        <p class="ex-label">예시 · <b>마케팅팀 광고선전비 (G/L 62701000)</b> · 2026년 9월 · 가상 수치</p>
+        <div id="p-ex" style="display:grid; gap:12px;"></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="mx-h">
+    <div class="section-head">
+      <span class="eyebrow">데이터 연결</span>
+      <h2 id="mx-h">어떤 비교를 어떤 데이터로 하는가</h2>
+      <p class="muted">세 데이터는 쪼개는 단위가 서로 다릅니다. 예산판은 분기, TB는 계정 단위라서 <b>부서별 월 비교와 원인 분석은 전표가 있어야</b> 합니다. 대신 세 데이터의 합계를 서로 맞춰보면 빠진 데이터가 없다는 보증이 됩니다.</p>
+    </div>
+    <div class="card tbl-scroll">
+      <table class="grid">
+        <thead><tr><th>분석</th><th>계정 단위 (전사)</th><th>부서 × 계정 단위</th></tr></thead>
+        <tbody>
+          <tr><th>전월 대비</th><td><span class="src tb">TB</span></td><td><span class="src je">전표 재집계</span></td></tr>
+          <tr><th>전분기 대비</th><td><span class="src tb">TB</span> 3개월 합산</td><td><span class="src bp">예산판</span></td></tr>
+          <tr><th>전년동기 대비</th><td><span class="src tb">TB</span> 전년 TB 필요</td><td><span class="src bp">예산판</span> 분기 · <span class="src je">전표</span> 월</td></tr>
+          <tr><th>예산 여유 판정</th><td><span class="src bp">예산판</span> 합산</td><td><span class="src bp">예산판</span> 배정·조정·잔여</td></tr>
+          <tr><th>원인 추정</th><td><span class="src je">전표</span></td><td><span class="src je">전표</span> 적요·거래처·전표유형</td></tr>
+          <tr><th>완전성 대사</th><td colspan="2">전표 합계 = TB 계정 증감 = 예산판 실적 합계 → 셋 중 하나라도 어긋나면 자가진단이 표시</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend"><span><span class="src bp">예산판</span> SAP 예산판 화면 내보내기</span><span><span class="src tb">TB</span> 월별 시산표</span><span><span class="src je">전표</span> 전표조회 화면 일괄 추출 (FAGLL03 · FBL3N · 자체 화면)</span></div>
+  </section>
+
+  <section aria-labelledby="rule-h">
+    <div class="section-head">
+      <span class="eyebrow">⑥ 원인 추정의 규칙</span>
+      <h2 id="rule-h">전표에서 읽어내는 8가지 패턴</h2>
+      <p class="muted">내부망에는 AI가 없으므로 문장을 이해하는 대신 규칙으로 판단합니다. 결과는 확정이 아니라 <b>근거 전표가 붙은 가설</b>이고, 담당 부서 확인을 거쳐 코멘트로 확정합니다.</p>
+    </div>
+    <div class="card tbl-scroll">
+      <table class="grid">
+        <thead><tr><th>패턴</th><th>판단 규칙</th><th>출력 문장 예시</th><th>근거 강도</th></tr></thead>
+        <tbody>
+          <tr><th>일회성 대형 지출</th><td>전표 1건이 증가분의 50% 이상</td><td>"9/18 전표 1건이 증가분의 71%. 일회성 지출로 보임"</td><td><span class="pill ok">높음</span></td></tr>
+          <tr><th>신규 거래처</th><td>비교 기간에 없던 거래처가 증가분의 30% 이상</td><td>"신규 거래처 B디지털 계약 개시 영향"</td><td><span class="pill warn">중간</span></td></tr>
+          <tr><th>단가 인상</th><td>매월 지급하는 거래처의 금액이 3개월 연속 상승</td><td>"월 지급액 8% 상승. 계약 단가 변경 가능성"</td><td><span class="pill warn">중간</span></td></tr>
+          <tr><th>계상 시점 이동</th><td>전월 급감 뒤 당월 급증, 또는 전년엔 다른 달에 있던 지출</td><td>"전월분이 늦게 계상됐을 가능성"</td><td><span class="pill warn">중간</span></td></tr>
+          <tr><th>정정 · 역분개</th><td>같은 금액의 +/− 전표 쌍</td><td>"정정 전표 영향. 순증 기준으로 다시 확인 필요"</td><td><span class="pill ok">높음</span></td></tr>
+          <tr><th>재분류</th><td>수기 대체 전표로 다른 부서·계정에서 넘어온 금액</td><td>"인사팀에서 계정 이관된 금액"</td><td><span class="pill ok">높음</span></td></tr>
+          <tr><th>연간 일괄 계상</th><td>적요에 연간·선급·일시 등 키워드</td><td>"연간 계약 일시 계상. 월할 안분 대상인지 확인"</td><td><span class="pill warn">중간</span></td></tr>
+          <tr><th>물량 vs 단가</th><td>건수 변화와 건당 금액 변화로 분해</td><td>"건수 +15%, 건당 +3%. 물량 증가가 주원인"</td><td><span class="pill muted" style="background:var(--line);color:var(--muted)">참고</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="net-h">
+    <div class="section-head">
+      <span class="eyebrow">망분리 환경</span>
+      <h2 id="net-h">외부망에서 만들고, 내부망에서 돌립니다</h2>
+      <p class="muted">실제 숫자는 내부망 밖으로 나가지 않습니다. 오가는 것은 프로그램 파일과 숫자 없는 점검 결과뿐입니다.</p>
+    </div>
+    <div class="lanes">
+      <div class="lane">
+        <h3><span class="tag">외부망</span>만들기</h3>
+        <ol>
+          <li>화면의 <b>열 이름만</b> 받아 같은 구조의 가상 데이터를 만듭니다.</li>
+          <li>엑셀 수식, VBA 코드(.bas 텍스트 파일), 대시보드 HTML을 만들고 가상 데이터로 검증합니다.</li>
+          <li>버전 번호를 붙여 반입합니다 (v0.1, v0.2 …).</li>
+        </ol>
+      </div>
+      <div class="lane in">
+        <h3><span class="tag">내부망</span>돌리기</h3>
+        <ol>
+          <li>엑셀 파일을 열고 VBA 파일을 가져와 .xlsm으로 저장합니다.</li>
+          <li>예산판, TB, 전표를 불러오면 자가진단이 결과를 띄웁니다.</li>
+          <li>문제가 있으면 <b>점검 항목과 상태 문장만</b> 외부망으로 전달합니다. 예: "미매핑 G/L 계정 확인필요"</li>
+        </ol>
+      </div>
+    </div>
+    <div class="handoff">
+      <span><b>반입</b> .xlsx · .bas · .html (실행파일 .exe 없음)</span>
+      <span><b>반출</b> 자가진단의 점검 항목·상태 문장만 (금액·코드·거래처명 없음)</span>
+    </div>
+  </section>
+
+  <section aria-labelledby="road-h">
+    <div class="section-head">
+      <span class="eyebrow">개발 순서</span>
+      <h2 id="road-h">전표 없이 되는 것부터 만듭니다</h2>
+      <p class="muted">1단계는 예산판과 TB만 있으면 됩니다. 전표 일괄 추출이 확인되면 2단계 원인 추정을 붙입니다.</p>
+    </div>
+    <div class="road">
+      <div class="step"><span class="when">1단계</span><h3>비교 · 예산 판정 · 주의 대상</h3><ul><li>예산판·TB 불러오기, 자가진단</li><li>전월·전분기·전년동기 비교</li><li>예산 여유/주의/부족 판정</li><li>주의 대상 TOP 10</li></ul></div>
+      <div class="step"><span class="when">2단계</span><h3>전표 원인 추정</h3><ul><li>전표 불러오기, 3자 대사</li><li>부서×계정 월 비교</li><li>증가분 분해와 8가지 패턴</li><li>근거 전표 목록</li></ul></div>
+      <div class="step"><span class="when">3단계</span><h3>리포트 · 이력 · 대시보드</h3><ul><li>PDF 리포트와 보고 문구</li><li>월마감 이력, 코멘트 누적</li><li>키워드 사전 보강</li><li>HTML 대시보드</li></ul></div>
+      <div class="step later"><span class="when">후속</span><h3>사업비 배분 · 차익</h3><ul><li>신계약·유지·수금 구분</li><li>IFRS 17 귀속/비귀속 배분</li><li>예정사업비 대비 사업비차익</li></ul></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="pre-h">
+    <div class="section-head">
+      <span class="eyebrow">시작 전 확인</span>
+      <h2 id="pre-h">먼저 확인할 네 가지</h2>
+    </div>
+    <ul class="checklist">
+      <li><span><b>예산판 내보내기</b> 엑셀로 내려받을 수 있는지, 열 이름, 계정이 G/L인지 예산항목인지</span></li>
+      <li><span><b>TB 형태</b> 월별로 뽑히는지, 전사 단위인지 부서별인지</span></li>
+      <li><span><b>전표 일괄 추출</b> 적요·거래처·코스트센터·전표유형 열이 있는 화면이 있는지 (원인 추정의 성패)</span></li>
+      <li><span><b>데이터 규모</b> 사업비 전표가 한 달에 몇 건인지 (엑셀 시트 한계 약 104만 행)</span></li>
+    </ul>
+  </section>
+
+  <footer>모든 금액·거래처·건수는 흐름을 설명하기 위한 가상 예시입니다. 금액 단위: 억원.</footer>
+</div>
+
+<script>
+const STAGES = [
+  {
+    n: "①", t: "세 파일 넣기", s: "예산판 · TB · 전표",
+    does: [
+      "SAP 예산판 화면을 엑셀로 내보낸 파일 (부서 × 계정 × 분기: 배정·조정·실적·잔여)",
+      "월별 TB (당해와 전년, 전년동기 비교용)",
+      "사업비 계정의 전표 라인 (전표번호, 전기일, 전표유형, G/L, 코스트센터, 금액, 적요, 거래처)",
+    ],
+    inp: "SAP 화면 내보내기 파일 3종", out: "원본 시트 3개",
+    ex: () => `
+      <div class="tbl-scroll"><table class="kv">
+        <thead><tr><th>파일</th><th>이 예시에서 담긴 것</th></tr></thead>
+        <tbody>
+          <tr><td>예산판</td><td>마케팅팀 · 광고선전비 · 3분기: 배정 4.5 / 조정 0 / 실적 6.0 / 잔여 2.2 (연간 기준)</td></tr>
+          <tr><td>TB</td><td>광고선전비 9월 증감 3.1 (전사)</td></tr>
+          <tr><td>전표</td><td>광고선전비 9월 전표 46건, 합계 3.1 (마케팅팀 2.9 + 인사팀 0.2)</td></tr>
+        </tbody>
+      </table></div>
+      <p class="note">예산판에서 클릭해야 보이던 전표 46건이 처음부터 한 시트에 들어옵니다.</p>`
+  },
+  {
+    n: "②", t: "불러오기 · 대사", s: "열 매핑, 3자 대사, 자가진단",
+    does: [
+      "열 이름으로 열을 찾아 불러옵니다. 화면 열 순서가 바뀌어도 됩니다.",
+      "코스트센터 → 부서, G/L → 사업비 항목 매핑을 적용합니다.",
+      "전표 합계, TB 증감, 예산판 실적이 서로 맞는지 대사합니다.",
+      "자가진단이 미매핑 코드, 누락 기간, 대사 차이를 문장으로 알려줍니다.",
+    ],
+    inp: "원본 시트 3개, 매핑표", out: "정리된 분석용 데이터, 자가진단 결과",
+    ex: () => `
+      <table class="kv">
+        <thead><tr><th>대사 항목</th><th class="num">A</th><th class="num">B</th><th>결과</th></tr></thead>
+        <tbody>
+          <tr><td>9월 전표 합계 ↔ TB 증감</td><td class="num">3.1</td><td class="num">3.1</td><td><span class="pill ok">일치</span></td></tr>
+          <tr><td>3분기 전표 ↔ 예산판 실적 (마케팅)</td><td class="num">6.0</td><td class="num">6.0</td><td><span class="pill ok">일치</span></td></tr>
+          <tr><td>미매핑 G/L 계정</td><td class="num" colspan="2">0건</td><td><span class="pill ok">OK</span></td></tr>
+        </tbody>
+      </table>
+      <p class="note">셋이 맞으면 "빠진 전표 없이 분석했다"고 말할 수 있습니다.</p>`
+  },
+  {
+    n: "③", t: "변동 분석", s: "전월 · 전분기 · 전년동기",
+    does: [
+      "사업비 항목별로 세 가지 기준의 증감액과 증감률을 계산합니다.",
+      "계정 단위는 TB, 부서 × 계정 월 단위는 전표를 재집계해서 씁니다.",
+      "분기 비교와 예산 관련 수치는 예산판을 씁니다.",
+    ],
+    inp: "정리된 데이터", out: "부서 × 계정 × 기준별 증감표",
+    ex: () => `
+      <table class="kv">
+        <thead><tr><th>기준</th><th class="num">비교</th><th class="num">당기</th><th class="num">증감</th><th>출처</th></tr></thead>
+        <tbody>
+          <tr><td>전월 대비</td><td class="num">1.2</td><td class="num">2.9</td><td class="num up">+142%</td><td>전표</td></tr>
+          <tr><td>전분기 대비</td><td class="num">4.1</td><td class="num">6.0</td><td class="num up">+46%</td><td>예산판</td></tr>
+          <tr><td>전년동기 대비</td><td class="num">1.8</td><td class="num">2.9</td><td class="num up">+61%</td><td>전표</td></tr>
+        </tbody>
+      </table>`
+  },
+  {
+    n: "④", t: "예산 점검", s: "여유 · 주의 · 부족 예상",
+    does: [
+      "가용예산 = 배정 + 조정. 잔여 = 가용 − 누계 실적.",
+      "남은 기간 예상 실적을 두 방법으로 구해 큰 값을 씁니다 (보수적): 최근 3개월 평균 × 남은 개월, 전년 같은 시기의 비중으로 연간 추정.",
+      "예상 소진율 90% 이하 여유, 90~100% 주의, 100% 초과 부족 예상. 부족 금액과 소진 예상 월을 표시합니다.",
+    ],
+    inp: "예산판, 월별 실적", out: "계정별 예산 판정, 부족 예상액, 소진 예상 월",
+    ex: () => `
+      <table class="kv">
+        <tbody>
+          <tr><td>연간 가용 (배정 18.0 + 조정 0)</td><td class="num">18.0</td></tr>
+          <tr><td>누계 실적 1~9월</td><td class="num">15.8</td></tr>
+          <tr><td>남은 3개월: 최근 평균 2.0 × 3</td><td class="num">6.0</td></tr>
+          <tr><td>남은 3개월: 전년 패턴 (1~9월이 연간의 70%)</td><td class="num">6.8</td></tr>
+          <tr><td><b>예상 연간 실적</b> (큰 값 적용)</td><td class="num"><b>22.6</b></td></tr>
+        </tbody>
+      </table>
+      <div style="display:grid; gap:6px;">
+        <div class="bar" role="img" aria-label="예상 소진율 126%, 가용예산 100% 지점 표시"><i class="crit" style="width:100%"></i><span class="tick" style="left:79%"></span></div>
+        <p style="font-size:13px;"><span class="pill crit">부족 예상</span> 예상 소진율 126% · 4.6 부족 · 10월 중 잔여 2.2 소진 예상</p>
+      </div>`
+  },
+  {
+    n: "⑤", t: "주의 대상 선정", s: "점수로 TOP 10",
+    does: [
+      "증감률, 증감액, 과거 24개월 변동폭 대비 이상 정도, 예산 소진 속도를 점수로 합칩니다.",
+      "금액이 작은 항목은 증감률이 커도 뒤로 밀리도록 금액 하한을 둡니다.",
+      "봐야 할 부서·계정을 점수 순으로 보여줍니다.",
+    ],
+    inp: "③ 증감표, ④ 예산 판정", out: "주의 대상 순위표",
+    ex: () => `
+      <table class="kv">
+        <thead><tr><th>순위</th><th>부서 · 계정</th><th>주된 사유</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td><b>마케팅팀 · 광고선전비</b></td><td>전월 +142%, 부족 예상</td></tr>
+          <tr><td class="num">2</td><td>IT운영팀 · 전산운영비</td><td>3개월 연속 상승</td></tr>
+          <tr><td class="num">3</td><td>영업지원팀 · 차량유지비</td><td>전년동기 +26%</td></tr>
+        </tbody>
+      </table>
+      <p class="note">1위 근거: 증가 1.7 · 24개월 평균 대비 3.1 표준편차 · 예산 소진 88% (경과율 75%)</p>`
+  },
+  {
+    n: "⑥", t: "원인 추정", s: "전표 패턴으로 가설",
+    does: [
+      "증가분을 거래처별, 적요 키워드별, 전표유형별, 코스트센터별로 쪼갭니다.",
+      "8가지 패턴 규칙에 맞춰 원인 후보 문장을 만듭니다.",
+      "후보마다 근거 강도와 근거 전표 목록을 붙입니다. 클릭해서 찾던 전표가 바로 보입니다.",
+    ],
+    inp: "주의 대상의 전표", out: "원인 후보, 근거 강도, 근거 전표",
+    ex: () => `
+      <p style="font-size:13px;">전월 대비 증가분 <b class="mono">+1.7</b> 분해</p>
+      <div class="split">
+        <div class="row"><div class="lbl"><span>A광고대행사 · 9/18 단건 1.2 · 적요 "3분기 TV캠페인 집행분"</span><div class="bar"><i style="width:71%"></i></div></div><span class="pct">71%</span></div>
+        <div class="row"><div class="lbl"><span>B디지털 0.3 · 전년 동기에 없던 거래처</span><div class="bar"><i style="width:18%"></i></div></div><span class="pct">18%</span></div>
+        <div class="row"><div class="lbl"><span>기타 9개 거래처 0.2</span><div class="bar"><i style="width:11%"></i></div></div><span class="pct">11%</span></div>
+      </div>
+      <table class="kv">
+        <tbody>
+          <tr><td>일회성 대형 지출 (A광고대행사 TV캠페인)</td><td><span class="pill ok">높음</span></td></tr>
+          <tr><td>신규 거래처 계약 개시 (B디지털)</td><td><span class="pill warn">중간</span></td></tr>
+        </tbody>
+      </table>`
+  },
+  {
+    n: "⑦", t: "보고 · 확인 · 학습", s: "리포트, 코멘트, 사전 보강",
+    does: [
+      "리포트·PDF와 보고 문구 초안을 만들고, HTML 대시보드용 데이터를 내보냅니다.",
+      "담당 부서가 확인한 원인을 코멘트로 남깁니다. 월마감 때 이력으로 쌓입니다.",
+      "확인 결과를 적요 키워드 사전에 반영해 다음 달 원인 추정을 보강합니다.",
+    ],
+    inp: "③~⑥ 결과, 담당자 확인", out: "리포트, 대시보드, 코멘트 이력, 키워드 사전",
+    ex: () => `
+      <p class="quote">마케팅팀 광고선전비 9월 2.9 (전월 +142%). 증가분의 71%는 A광고대행사 TV캠페인 단건 전표(9/18). 현 추세면 연간 4.6 부족 예상, 10월 중 잔여 소진.</p>
+      <table class="kv">
+        <tbody>
+          <tr><td>담당 확인</td><td>"3분기 신상품 캠페인 집행을 앞당김. 4분기 집행분에서 조정 예정"</td></tr>
+          <tr><td>사전 보강</td><td>키워드 <span class="mono">TV캠페인</span> → 일회성 캠페인</td></tr>
+        </tbody>
+      </table>`
+  },
+];
+
+const pipe = document.getElementById("pipe");
+let cur = 0;
+STAGES.forEach((st, i) => {
+  const li = document.createElement("li");
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "stage"; b.id = "stage-" + i;
+  b.setAttribute("aria-pressed", "false");
+  b.innerHTML = `<span class="n">${st.n}</span><span class="t">${st.t}</span><span class="s">${st.s}</span>`;
+  b.addEventListener("click", () => show(i));
+  li.appendChild(b); pipe.appendChild(li);
+});
+
+function show(i) {
+  cur = i;
+  const st = STAGES[i];
+  document.querySelectorAll(".stage").forEach((b, j) => b.setAttribute("aria-pressed", j === i ? "true" : "false"));
+  document.getElementById("p-n").textContent = st.n;
+  document.getElementById("p-t").textContent = st.t;
+  document.getElementById("p-does").innerHTML = st.does.map(d => `<li>${d}</li>`).join("");
+  document.getElementById("p-in").textContent = st.inp;
+  document.getElementById("p-out").textContent = st.out;
+  document.getElementById("p-ex").innerHTML = st.ex();
+  document.getElementById("prev").disabled = i === 0;
+  document.getElementById("next").disabled = i === STAGES.length - 1;
+}
+document.getElementById("prev").addEventListener("click", () => cur > 0 && show(cur - 1));
+document.getElementById("next").addEventListener("click", () => cur < STAGES.length - 1 && show(cur + 1));
+pipe.addEventListener("keydown", e => {
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); if (cur < STAGES.length - 1) { show(cur + 1); document.getElementById("stage-" + cur).focus(); } }
+  if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); if (cur > 0) { show(cur - 1); document.getElementById("stage-" + cur).focus(); } }
+});
+show(0);
+</script>

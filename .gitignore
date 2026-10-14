@@ -1,0 +1,7 @@
+~$*
+*.tmp
+__pycache__/
+src/tool_data.json
+.DS_Store
+# 실제 업무 데이터는 올리지 마세요
+*.xlsm

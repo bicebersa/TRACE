@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TRACE 대시보드</title>
+<style>
+/* 레이아웃: 상단 요약(KPI) → 사업비(차트 4개) → 주의 대상 TOP 10과 원인 상세 → 재무 요약. 외부 리소스 없이 동작 */
+:root {
+  --bg: #f3f5f4; --surface: #ffffff; --ink: #16231f; --muted: #5b6b66; --line: #d5ddd9; --grid: #e6ebe8;
+  --accent: #17705a; --accent-soft: #e1f0ea; --prev: #9fb3ab; --budget: #b07d1f;
+  --warn: #9a6512; --warn-soft: #fbf0dc; --crit: #b4372f; --crit-soft: #f8e2df; --info: #6b4fa0; --info-soft: #ece6f6;
+  --csm: #2f5d9e; --csm-soft: #e3ebf7;
+  --font: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  --mono: Consolas, "SFMono-Regular", Menlo, ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #2a3833; --grid: #222d29;
+    --accent: #4fbf9a; --accent-soft: #183128; --prev: #5d7068; --budget: #d9a441;
+    --warn: #e0a84a; --warn-soft: #33281a; --crit: #ef7a6e; --crit-soft: #3a1f1c; --info: #b49be0; --info-soft: #2a2238; --csm: #82a9e8; --csm-soft: #1b2638; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #2a3833; --grid: #222d29;
+  --accent: #4fbf9a; --accent-soft: #183128; --prev: #5d7068; --budget: #d9a441;
+  --warn: #e0a84a; --warn-soft: #33281a; --crit: #ef7a6e; --crit-soft: #3a1f1c; --info: #b49be0; --info-soft: #2a2238; --csm: #82a9e8; --csm-soft: #1b2638; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.55; padding-inline: 16px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 24px 56px; display: grid; gap: 28px; }
+h1, h2, h3 { margin: 0; line-height: 1.3; text-wrap: balance; }
+h1 { font-size: 24px; }
+h2 { font-size: 17px; }
+h3 { font-size: 14px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+.eyebrow { font-size: 11.5px; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
+
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+header.top .meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12.5px; }
+.badge { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 2px 10px; white-space: nowrap; }
+.badge.ok { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.badge.ng { background: var(--crit-soft); border-color: transparent; color: var(--crit); }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 2px; }
+.kpi .l { font-size: 12px; color: var(--muted); }
+.kpi .v { font-size: 21px; font-weight: 700; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.kpi .s { font-size: 12px; color: var(--muted); }
+.up { color: var(--crit); } .down { color: var(--accent); }
+
+section { display: grid; gap: 12px; }
+.sec-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.legend i.line { height: 2px; border-radius: 0; vertical-align: 3px; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+svg text { fill: var(--muted); font-family: var(--font); font-size: 11px; }
+svg .val { fill: var(--ink); font-family: var(--mono); font-size: 10.5px; }
+
+/* 부서별 예산 바 */
+.brow { display: grid; grid-template-columns: 82px minmax(0, 1fr) 64px; gap: 10px; align-items: center; font-size: 12.5px; }
+.btrack { position: relative; height: 18px; background: var(--grid); border-radius: 4px; }
+.btrack .ytd { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 4px 0 0 4px; }
+.btrack .fc { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, var(--accent) 0 3px, transparent 3px 6px); opacity: .55; }
+.btrack .fc.over { background: repeating-linear-gradient(135deg, var(--crit) 0 3px, transparent 3px 6px); opacity: .8; }
+.btrack .cap { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); }
+.brow .rt { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* 계정별 */
+.arow { display: grid; grid-template-columns: 128px minmax(0, 1fr) 70px; gap: 10px; align-items: center; font-size: 12.5px; }
+.abars { display: grid; gap: 2px; }
+.abars span { display: block; height: 7px; border-radius: 3px; }
+.abars .c { background: var(--accent); } .abars .p { background: var(--prev); }
+.arow .d { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.scroll { max-height: 360px; overflow-y: auto; display: grid; gap: 7px; padding-right: 4px; }
+
+/* 상태 pill */
+.pill { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
+.pill.여유 { background: var(--accent-soft); color: var(--accent); }
+.pill.주의 { background: var(--warn-soft); color: var(--warn); }
+.pill.부족 { background: var(--crit-soft); color: var(--crit); }
+.pill.무예산 { background: var(--info-soft); color: var(--info); }
+.pill.높음 { background: var(--accent-soft); color: var(--accent); }
+.pill.중간 { background: var(--warn-soft); color: var(--warn); }
+.pill.참고 { background: var(--grid); color: var(--muted); }
+
+/* TOP 10 + 상세 */
+.watch { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 12px; align-items: start; }
+@media (max-width: 980px) { .watch { grid-template-columns: 1fr; } }
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th, td { padding: 7px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { font-size: 11.5px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+td.r, th.r { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+tbody tr.pick { cursor: pointer; }
+tbody tr.pick:hover td { background: var(--grid); }
+tbody tr.pick[aria-selected="true"] td { background: var(--accent-soft); }
+tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rank { font-family: var(--mono); font-weight: 700; color: var(--accent); }
+.sig { font-size: 11.5px; color: var(--muted); }
+.detail h3 { font-size: 16px; }
+.summary { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 9px 12px; border-radius: 0 8px 8px 0; font-size: 13.5px; }
+.cands { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.cands li { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: start; font-size: 13px; }
+.cands li b { font-weight: 700; }
+.cands .t { grid-column: 2; color: var(--muted); font-size: 12.5px; }
+.vrow { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr) 64px 44px; gap: 8px; align-items: center; font-size: 12.5px; }
+.vbar { height: 10px; background: var(--grid); border-radius: 5px; position: relative; overflow: hidden; }
+.vbar i { position: absolute; top: 0; bottom: 0; left: 0; background: var(--accent); border-radius: 5px; }
+.vbar i.neg { background: var(--prev); }
+.new { font-size: 10.5px; font-weight: 700; color: var(--warn); background: var(--warn-soft); border-radius: 4px; padding: 0 5px; margin-left: 4px; }
+.neg-amt { color: var(--crit); }
+.comment { font-size: 12.5px; color: var(--muted); }
+.comment b { color: var(--ink); font-weight: 600; }
+
+.tgt { display: inline-block; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.tgt.csm { background: var(--csm-soft); color: var(--csm); } .tgt.pl { background: var(--warn-soft); color: var(--warn); } .tgt.sep { background: var(--grid); color: var(--muted); }
+.stack { display: flex; height: 22px; border-radius: 5px; overflow: hidden; }
+.stack span { display: block; height: 100%; }
+.summary17 { border-left: 3px solid var(--csm); background: var(--csm-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 13.5px; }
+.empty { background: var(--surface); border: 1px dashed var(--line); border-radius: 10px; padding: 28px; text-align: center; display: grid; gap: 8px; }
+footer { font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="empty" id="empty" hidden>
+    <h2>data.js를 찾지 못했습니다</h2>
+    <p class="muted">엑셀(TRACE_v0.4.xlsm)에서 [대시보드 내보내기] 버튼을 누르면 같은 폴더에 data.js가 생깁니다. 이 HTML을 같은 폴더에 두고 다시 여세요.</p>
+  </div>
+</div>
+<script src="data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.TRACE_DATA;
+  var app = document.getElementById("app");
+  if (!D) { document.getElementById("empty").hidden = false; return; }
+
+  // ---------- 서식
+  function fmt(v, d) {
+    if (v === null || v === undefined || v === "") return "-";
+    d = d === undefined ? 0 : d;
+    var s = Math.abs(v).toLocaleString("ko-KR", { minimumFractionDigits: d, maximumFractionDigits: d });
+    return (v < 0 ? "△" : "") + s;
+  }
+  function pct(v, signed) {
+    if (v === null || v === undefined || v === "") return "-";
+    var s = (Math.abs(v) * 100).toFixed(Math.abs(v) < 0.1 ? 1 : 0) + "%";
+    if (!signed) return (v < 0 ? "△" : "") + s;
+    return (v > 0 ? "+" : v < 0 ? "−" : "") + s;
+  }
+  function esc(s) { return String(s === null || s === undefined ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function statusCls(s) { return s === "부족 예상" ? "부족" : (s || ""); }
+  function el(html) { var t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
+  function niceMax(v) { if (v <= 0) return 1; var p = Math.pow(10, Math.floor(Math.log10(v))); var n = v / p; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p; }
+
+  // ---------- SVG 차트
+  function barChart(o) {
+    var W = 560, H = 230, L = 52, R = 8, T = 10, B = 26, n = o.labels.length, k = o.series.length;
+    var all = []; o.series.forEach(function (s) { all = all.concat(s.values); }); if (o.line) all = all.concat(o.line.values);
+    var max = niceMax(Math.max.apply(null, all.concat([0])));
+    var cw = (W - L - R) / n, bw = Math.min(16, (cw - 8) / k);
+    var y = function (v) { return T + (H - T - B) * (1 - v / max); };
+    var g = "";
+    for (var i = 0; i <= 4; i++) {
+      var v = max * i / 4, yy = y(v);
+      g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yy + '" y2="' + yy + '" stroke="var(--grid)"/>';
+      g += '<text x="' + (L - 6) + '" y="' + (yy + 4) + '" text-anchor="end">' + fmt(v) + '</text>';
+    }
+    o.labels.forEach(function (lab, i) {
+      var x0 = L + cw * i + (cw - bw * k) / 2;
+      o.series.forEach(function (s, j) {
+        var v = s.values[i]; if (!v) return;
+        g += '<rect x="' + (x0 + j * bw) + '" y="' + y(Math.max(v, 0)) + '" width="' + (bw - 1.5) + '" height="' + Math.abs(y(0) - y(v)) + '" rx="1.5" fill="' + s.color + '"><title>' + esc(lab + " " + s.name + ": " + fmt(v, 1)) + '</title></rect>';
+      });
+      g += '<text x="' + (L + cw * i + cw / 2) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(lab) + '</text>';
+    });
+    if (o.line) {
+      var pts = o.line.values.map(function (v, i) { return (L + cw * i + cw / 2) + "," + y(v); }).join(" ");
+      g += '<polyline points="' + pts + '" fill="none" stroke="' + o.line.color + '" stroke-width="2" stroke-dasharray="5 4"/>';
+    }
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(o.label) + '">' + g + '</svg>';
+  }
+  function lineChart(o) {
+    var W = 560, H = 230, L = 64, R = 10, T = 10, B = 26, n = o.labels.length;
+    var all = []; o.series.forEach(function (s) { all = all.concat(s.values); });
+    var mn = Math.min.apply(null, all), mx = Math.max.apply(null, all), pad = (mx - mn) * 0.12 || mx * 0.05;
+    var lo = Math.max(0, mn - pad), hi = mx + pad, step = niceMax((hi - lo) / 4);
+    lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+    var x = function (i) { return L + (W - L - R) * (n === 1 ? 0.5 : i / (n - 1)); };
+    var y = function (v) { return T + (H - T - B) * (1 - (v - lo) / (hi - lo)); };
+    var g = "";
+    for (var v = lo; v <= hi + step / 2; v += step) {
+      g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '" stroke="var(--grid)"/>';
+      g += '<text x="' + (L - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + fmt(v) + '</text>';
+    }
+    o.labels.forEach(function (lab, i) { if (i % 2 === 0 || i === n - 1) g += '<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(lab.slice(2)) + '</text>'; });
+    o.series.forEach(function (s) {
+      g += '<polyline points="' + s.values.map(function (v, i) { return x(i) + "," + y(v); }).join(" ") + '" fill="none" stroke="' + s.color + '" stroke-width="2.2"/>';
+      var li = s.values.length - 1;
+      g += '<circle cx="' + x(li) + '" cy="' + y(s.values[li]) + '" r="3.5" fill="' + s.color + '"/>';
+    });
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(o.label) + '">' + g + '</svg>';
+  }
+  function donut(items) {
+    var total = items.reduce(function (a, b) { return a + b.count; }, 0) || 1, a0 = -Math.PI / 2, g = "", R = 70, r = 44, cx = 90, cy = 90;
+    items.forEach(function (it) {
+      if (!it.count) return;
+      var a1 = a0 + 2 * Math.PI * it.count / total, big = a1 - a0 > Math.PI ? 1 : 0;
+      if (it.count === total) a1 -= 0.0001;
+      var p = function (rad, a) { return (cx + rad * Math.cos(a)) + " " + (cy + rad * Math.sin(a)); };
+      g += '<path d="M ' + p(R, a0) + ' A ' + R + ' ' + R + ' 0 ' + big + ' 1 ' + p(R, a1) + ' L ' + p(r, a1) + ' A ' + r + ' ' + r + ' 0 ' + big + ' 0 ' + p(r, a0) + ' Z" fill="' + it.color + '"><title>' + esc(it.status + " " + it.count + "건") + '</title></path>';
+      a0 = a1;
+    });
+    g += '<text x="' + cx + '" y="' + (cy - 2) + '" text-anchor="middle" class="val" style="font-size:20px;font-weight:700">' + total + '</text>';
+    g += '<text x="' + cx + '" y="' + (cy + 16) + '" text-anchor="middle">부서×계정</text>';
+    return '<svg viewBox="0 0 180 180" style="max-width:190px" role="img" aria-label="예산 판정 분포">' + g + '</svg>';
+  }
+
+  // ---------- 머리
+  var m = D.meta;
+  var ok = function (s) { return /정상|일치/.test(s || ""); };
+  app.appendChild(el('<header class="top"><div style="display:grid;gap:4px"><span class="eyebrow">TRACE · 사업비 원인추적기</span><h1>' + esc(m.company) + ' 대시보드 <span class="muted" style="font-weight:400">' + esc(m.period) + '</span></h1></div>' +
+    '<div class="meta"><span class="badge">단위: ' + esc(m.unit) + '</span><span class="badge ' + (ok(m.check) ? "ok" : "ng") + '">자가진단: ' + esc(m.check) + '</span>' +
+    '<span class="badge ' + (ok(m.recon) ? "ok" : "ng") + '">3자 대사: ' + esc(m.recon) + '</span><span class="badge">생성: ' + esc(m.generated) + '</span></div></header>'));
+
+  var kpiHtml = D.kpi.map(function (k) {
+    var sub = k.rate === null || k.rate === undefined ? esc(k.basis) + " " + fmt(k.compare) + "건"
+      : esc(k.basis) + ' 대비 <b class="' + (k.label.indexOf("사업비") === 0 ? (k.rate > 0 ? "up" : "down") : "") + '">' + pct(k.rate, true) + '</b>';
+    return '<div class="kpi"><span class="l">' + esc(k.label) + '</span><span class="v">' + fmt(k.value) + (k.rate === null ? '<span style="font-size:13px">건</span>' : "") + '</span><span class="s">' + sub + '</span></div>';
+  }).join("");
+  app.appendChild(el('<div class="kpis">' + kpiHtml + '</div>'));
+
+  // ---------- 사업비
+  var labelsM = D.monthly.map(function (r) { return r.month; });
+  var maxDept = Math.max.apply(null, D.depts.map(function (d) { return Math.max(d.avail, d.forecast); }));
+  var deptRows = D.depts.map(function (d) {
+    var w = function (v) { return (v / maxDept * 100).toFixed(2) + "%"; };
+    var over = d.forecast > d.avail;
+    return '<div class="brow"><span>' + esc(d.name) + '</span><div class="btrack" title="' + esc(d.name + " · 가용 " + fmt(d.avail, 1) + " · 누계 " + fmt(d.ytd, 1) + " · 예상 " + fmt(d.forecast, 1)) + '">' +
+      '<span class="ytd" style="width:' + w(d.ytd) + '"></span><span class="fc' + (over ? " over" : "") + '" style="left:' + w(d.ytd) + ';width:' + w(Math.max(0, d.forecast - d.ytd)) + '"></span>' +
+      '<span class="cap" style="left:' + w(d.avail) + '"></span></div><span class="rt">' + pct(d.rate) + ' <span class="pill ' + statusCls(d.status) + '" style="font-size:10px;padding:0 6px">' + esc(d.status === "부족 예상" ? "부족" : d.status) + '</span></span></div>';
+  }).join("");
+  var colors = { "여유": "var(--accent)", "주의": "var(--warn)", "부족 예상": "var(--crit)", "무예산": "var(--info)" };
+  var st = D.status.map(function (s) { return { status: s.status, count: s.count, color: colors[s.status] }; });
+  var acc = D.accounts.slice().sort(function (a, b) { return b.cur - a.cur; });
+  var amax = Math.max.apply(null, acc.map(function (a) { return Math.max(a.cur, a.prevYear); })) || 1;
+  var accRows = acc.map(function (a) {
+    var r = a.prevYear > 0 ? a.cur / a.prevYear - 1 : null;
+    return '<div class="arow"><span title="' + esc(a.gl) + '">' + esc(a.name) + '</span><div class="abars"><span class="c" style="width:' + (a.cur / amax * 100).toFixed(1) + '%"></span><span class="p" style="width:' + (a.prevYear / amax * 100).toFixed(1) + '%"></span></div>' +
+      '<span class="d ' + (r > 0.2 ? "up" : "") + '">' + (r === null ? "신규" : pct(r, true)) + '</span></div>';
+  }).join("");
+  app.appendChild(el('<section><div class="sec-head"><span class="eyebrow">TREND · RISK</span><h2>사업비</h2><span class="muted">전표 기준 · 예산은 예산판 배정+조정</span></div><div class="grid2">' +
+    '<div class="card"><div class="card-head"><h3>월별 사업비</h3><div class="legend"><span><i style="background:var(--accent)"></i>당해</span><span><i style="background:var(--prev)"></i>전년</span><span><i class="line" style="background:var(--budget)"></i>예산(분기가용÷3)</span></div></div>' +
+    barChart({ label: "월별 사업비", labels: labelsM, series: [{ name: "당해", values: D.monthly.map(function (r) { return r.cur; }), color: "var(--accent)" }, { name: "전년", values: D.monthly.map(function (r) { return r.prev; }), color: "var(--prev)" }], line: { values: D.monthly.map(function (r) { return r.budget; }), color: "var(--budget)" } }) + '</div>' +
+    '<div class="card"><div class="card-head"><h3>부서별 예산 소진 전망</h3><div class="legend"><span><i style="background:var(--accent)"></i>누계 실적</span><span><i style="background:repeating-linear-gradient(135deg,var(--accent) 0 2px,transparent 2px 4px)"></i>남은 기간 예상</span><span><i style="background:var(--ink);width:2px"></i>연간 가용</span></div></div>' +
+    '<div style="display:grid;gap:9px">' + deptRows + '</div><p class="muted" style="font-size:12px;margin:0">오른쪽 숫자 = 예상 연간 실적 ÷ 연간 가용</p></div>' +
+    '<div class="card"><div class="card-head"><h3>계정별 당월 vs 전년동월</h3><div class="legend"><span><i style="background:var(--accent)"></i>당월</span><span><i style="background:var(--prev)"></i>전년동월</span></div></div><div class="scroll">' + accRows + '</div></div>' +
+    '<div class="card"><div class="card-head"><h3>예산 판정 분포</h3></div><div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">' + donut(st) +
+    '<div style="display:grid;gap:8px">' + st.map(function (s) { return '<div style="display:flex;gap:10px;align-items:center"><span class="pill ' + statusCls(s.status) + '">' + esc(s.status) + '</span><span class="num" style="font-size:16px;font-weight:700">' + s.count + '</span><span class="muted">건</span></div>'; }).join("") +
+    '<p class="muted" style="font-size:12px;margin:4px 0 0">예상 소진율 90% 초과 주의, 100% 초과 부족 예상</p></div></div></div>' +
+    '</div></section>'));
+
+  // ---------- 주의 대상 + 원인
+  var rows = D.top10.map(function (t, i) {
+    return '<tr class="pick" tabindex="0" data-i="' + i + '" aria-selected="false"><td class="rank">' + t.rank + '</td><td><b>' + esc(t.dept) + '</b><br><span class="sig">' + esc(t.account) + '</span></td>' +
+      '<td class="r">' + fmt(t.cur, 1) + '</td><td class="r ' + (t.mom > 0.2 ? "up" : "") + '">' + pct(t.mom, true) + '</td><td><span class="pill ' + statusCls(t.status) + '">' + esc(t.status) + '</span></td>' +
+      '<td class="sig">' + esc(t.signal || "") + '</td><td class="r">' + fmt(t.score, 1) + '</td></tr>';
+  }).join("");
+  var watch = el('<section><div class="sec-head"><span class="eyebrow">ANOMALY · CAUSE</span><h2>주의 대상 TOP 10</h2><span class="muted">행을 누르면 오른쪽에 원인 후보와 근거 전표가 나옵니다 (전월 대비)</span></div>' +
+    '<div class="watch"><div class="card tbl-wrap"><table><thead><tr><th>#</th><th>부서 · 계정</th><th class="r">당월</th><th class="r">전월대비</th><th>예산</th><th>신호</th><th class="r">점수</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+    '<div class="card detail" id="detail" aria-live="polite"></div></div></section>');
+  app.appendChild(watch);
+  function showDetail(i) {
+    var t = D.top10[i], c = t.cause;
+    watch.querySelectorAll("tr.pick").forEach(function (tr) { tr.setAttribute("aria-selected", tr.getAttribute("data-i") == i ? "true" : "false"); });
+    var vmax = Math.max.apply(null, c.vendors.map(function (v) { return Math.abs(v.diff); }).concat([0.0001]));
+    var html = '<div class="card-head"><h3>' + t.rank + '. ' + esc(t.dept) + ' · ' + esc(t.account) + '</h3><span class="pill ' + statusCls(t.status) + '">예산 ' + esc(t.status) + (t.month ? " · " + esc(t.month) + " 소진" : "") + '</span></div>' +
+      '<p class="summary">' + esc(c.summary) + '</p>' +
+      '<div><h3 style="margin-bottom:6px">원인 후보</h3><ul class="cands">' + c.candidates.map(function (k) {
+        return '<li>' + (k.strength ? '<span class="pill ' + esc(k.strength) + '">' + esc(k.strength) + '</span>' : '<span></span>') + '<b>' + esc(k.pattern) + '</b><span class="t">' + esc(k.text) + '</span></li>';
+      }).join("") + '</ul></div>' +
+      '<div><h3 style="margin-bottom:6px">거래처별 증감 <span class="muted" style="font-weight:400">당기 ' + fmt(c.curTotal, 1) + ' · 비교 ' + fmt(c.cmpTotal, 1) + '</span></h3><div style="display:grid;gap:6px">' +
+      c.vendors.slice(0, 6).map(function (v) {
+        return '<div class="vrow"><span>' + esc(v.name) + (v.isNew === "Y" ? '<span class="new">신규</span>' : "") + '</span><div class="vbar"><i class="' + (v.diff < 0 ? "neg" : "") + '" style="width:' + (Math.abs(v.diff) / vmax * 100).toFixed(1) + '%"></i></div>' +
+          '<span class="num" style="text-align:right">' + (v.diff > 0 ? "+" : "") + fmt(v.diff, 1) + '</span><span class="num muted" style="text-align:right">' + (v.share === null || v.share === undefined ? "" : pct(v.share)) + '</span></div>';
+      }).join("") + '</div></div>' +
+      '<div class="tbl-wrap"><h3 style="margin-bottom:6px">근거 전표 (당기, 금액 큰 순)</h3><table><thead><tr><th>전기일</th><th>전표번호</th><th>유형</th><th>거래처</th><th>적요</th><th class="r">금액</th></tr></thead><tbody>' +
+      c.evidence.slice(0, 8).map(function (e) {
+        return '<tr><td class="num">' + esc((e.date || "").slice(5)) + '</td><td class="num">' + esc(e.doc) + '</td><td>' + esc(e.type) + '</td><td>' + esc(e.vendor) + '</td><td>' + esc(e.text) + '</td><td class="r ' + (e.amt < 0 ? "neg-amt" : "") + '">' + fmt(e.amt, 1) + '</td></tr>';
+      }).join("") + '</tbody></table></div>' +
+      '<p class="comment"><b>확인된 원인:</b> ' + esc(t.comment || "(미확인)") + '</p>';
+    document.getElementById("detail").innerHTML = html;
+  }
+  watch.querySelector("tbody").addEventListener("click", function (e) { var tr = e.target.closest("tr.pick"); if (tr) showDetail(+tr.getAttribute("data-i")); });
+  watch.querySelector("tbody").addEventListener("keydown", function (e) {
+    var tr = e.target.closest("tr.pick"); if (!tr) return;
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); showDetail(+tr.getAttribute("data-i")); }
+    if (e.key === "ArrowDown" && tr.nextElementSibling) { e.preventDefault(); tr.nextElementSibling.focus(); showDetail(+tr.nextElementSibling.getAttribute("data-i")); }
+    if (e.key === "ArrowUp" && tr.previousElementSibling) { e.preventDefault(); tr.previousElementSibling.focus(); showDetail(+tr.previousElementSibling.getAttribute("data-i")); }
+  });
+  showDetail(0);
+
+  // ---------- IFRS 17 (GMM) 사업비 영향
+  var X = D.ifrs17;
+  if (X) {
+    var tcls = function (t) { return /CSM/.test(t) ? "csm" : /구분계리/.test(t) ? "sep" : "pl"; };
+    var br = X.bridge.filter(function (b) { return b.code !== "F00" && b.code !== "F99"; });
+    var wf = (function () {
+      var W = 560, H = 250, L = 150, R = 60, T = 8, rowH = (H - T - 8) / (br.length + 1), cum = 0, pts = [];
+      br.forEach(function (b) { pts.push([cum, cum + b.csm]); cum += b.csm; });
+      var all = [0]; pts.forEach(function (p) { all.push(p[0], p[1]); });
+      var mn = Math.min.apply(null, all), mx = Math.max.apply(null, all), span = (mx - mn) || 1;
+      var x = function (v) { return L + (W - L - R) * (v - mn) / span; }, g = "";
+      g += '<line x1="' + x(0) + '" x2="' + x(0) + '" y1="' + T + '" y2="' + (H - 4) + '" stroke="var(--line)"/>';
+      br.forEach(function (b, i) {
+        var y = T + rowH * i, a = pts[i][0], c = pts[i][1], col = b.expense ? "var(--csm)" : (b.csm < 0 ? "var(--crit)" : "var(--accent)");
+        g += '<text x="' + (L - 8) + '" y="' + (y + rowH / 2 + 4) + '" text-anchor="end"' + (b.expense ? ' style="font-weight:700;fill:var(--csm)"' : "") + '>' + esc(b.name) + '</text>';
+        if (Math.abs(b.csm) > 0.05) g += '<rect x="' + Math.min(x(a), x(c)) + '" y="' + (y + 4) + '" width="' + Math.max(1.5, Math.abs(x(c) - x(a))) + '" height="' + (rowH - 8) + '" rx="2" fill="' + col + '" opacity="' + (b.expense ? 1 : .75) + '"><title>' + esc(b.name + " " + fmt(b.csm, 1)) + '</title></rect>';
+        g += '<text class="val" x="' + (Math.max(x(a), x(c)) + 5) + '" y="' + (y + rowH / 2 + 4) + '">' + (Math.abs(b.csm) > 0.05 ? (b.csm > 0 ? "+" : "") + fmt(b.csm, 0) : "-") + '</text>';
+      });
+      var yE = T + rowH * br.length;
+      g += '<text x="' + (L - 8) + '" y="' + (yE + rowH / 2 + 4) + '" text-anchor="end" style="font-weight:700;fill:var(--ink)">당월 순변동</text>';
+      g += '<rect x="' + Math.min(x(0), x(cum)) + '" y="' + (yE + 4) + '" width="' + Math.max(1.5, Math.abs(x(cum) - x(0))) + '" height="' + (rowH - 8) + '" rx="2" fill="var(--ink)"/>';
+      g += '<text class="val" x="' + (Math.max(x(0), x(cum)) + 5) + '" y="' + (yE + rowH / 2 + 4) + '" style="font-weight:700">' + (cum > 0 ? "+" : "") + fmt(cum, 0) + '</text>';
+      return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="GMM CSM 변동 요인">' + g + '</svg>';
+    })();
+    var pfIds = []; X.pf.forEach(function (r) { if (pfIds.indexOf(r.pf) < 0) pfIds.push(r.pf); });
+    var pfRows = pfIds.map(function (id) {
+      var rs = X.pf.filter(function (r) { return r.pf === id; }), r0 = rs[0];
+      return '<tr><td><b>' + esc(r0.name) + '</b><br><span class="sig">' + esc(id) + ' · ' + esc(r0.model) + '</span></td>' + rs.map(function (r) {
+        return '<td class="r ' + (r.diff < 0 ? "up" : "") + '">' + (r.diff > 0 ? "+" : "") + fmt(r.diff, 1) + '<br><span class="tgt ' + tcls(r.target) + '">' + esc(r.target.replace("(보험서비스결과)", "")) + '</span></td>';
+      }).join("") + '</tr>';
+    }).join("");
+    var acol = { "비귀속": "var(--prev)", "신계약비": "var(--csm)", "유지비": "var(--accent)", "수금비": "var(--budget)" };
+    var stack = X.alloc.map(function (a) { return '<span title="' + esc(a.cat + " " + fmt(a.cur, 1)) + '" style="width:' + ((a.share || 0) * 100).toFixed(2) + '%;background:' + acol[a.cat] + '"></span>'; }).join("");
+    var allocLeg = X.alloc.map(function (a) { return '<span><i style="background:' + acol[a.cat] + '"></i>' + esc(a.cat) + ' <b class="num">' + fmt(a.cur, 1) + '</b> (' + pct(a.share) + ')</span>'; }).join("");
+    var drv = X.drivers.filter(function (d) { return d.dept; }).map(function (d) {
+      return '<tr><td>' + esc(d.dept) + '<br><span class="sig">' + esc(d.account) + '</span></td><td class="r">' + fmt(d.cur, 1) + '</td><td class="r">' + fmt(d.prev, 1) + '</td><td class="r ' + (d.diff > 0 ? "up" : "") + '">' + (d.diff > 0 ? "+" : "") + fmt(d.diff, 1) + '</td></tr>';
+    }).join("");
+    var ev17 = X.evidence.filter(function (e) { return e.doc; }).slice(0, 6).map(function (e) {
+      return '<tr><td class="num">' + esc(String(e.date || "").slice(5, 10)) + '</td><td>' + esc(e.vendor) + '</td><td>' + esc(e.text) + '</td><td class="r">' + fmt(e.nb, 1) + '</td></tr>';
+    }).join("");
+    var rec = X.recon.map(function (r) {
+      return '<tr><td>' + esc(r.pf) + ' <span class="sig">' + esc(r.model) + '</span></td><td class="r">' + fmt(r.actuary, 1) + '</td><td class="r">' + fmt(r.trace, 1) + '</td><td><span class="pill ' + (r.status === "일치" ? "여유" : r.status === "차이 확인" ? "부족" : "참고") + '">' + esc(r.status) + '</span></td></tr>';
+    }).join("");
+    app.appendChild(el('<section><div class="sec-head"><span class="eyebrow">IFRS 17 · GMM</span><h2>사업비가 CSM·손익에 준 영향</h2><span class="muted">귀속 배분 → 포트폴리오 → 예정 대비 경험차이 · 변액(VFA)은 구분계리로 제외</span></div>' +
+      '<p class="summary17">' + esc(X.summary) + '</p><div class="grid2">' +
+      '<div class="card"><div class="card-head"><h3>GMM CSM 변동 요인 (당월)</h3><div class="legend"><span><i style="background:var(--csm)"></i>사업비 관련</span><span><i style="background:var(--accent)"></i>증가</span><span><i style="background:var(--crit)"></i>감소</span></div></div>' + wf +
+      '<p class="muted" style="font-size:12px;margin:0">CSM 순변동 ' + (X.csmChange > 0 ? "+" : "") + fmt(X.csmChange, 0) + ' 중 사업비 관련 ' + (X.csmExpense > 0 ? "+" : "") + fmt(X.csmExpense, 1) + '</p></div>' +
+      '<div class="card"><div class="card-head"><h3>포트폴리오별 경험차이 (예정 − 실제)</h3></div><div class="tbl-wrap"><table><thead><tr><th>포트폴리오</th><th class="r">신계약비</th><th class="r">유지비</th><th class="r">수금비</th></tr></thead><tbody>' + pfRows + '</tbody></table></div>' +
+      '<div class="legend"><span>CSM 조정 <b class="num">' + fmt(X.totals.csm, 1) + '</b></span><span>당기손익 <b class="num">' + fmt(X.totals.pl, 1) + '</b></span><span>구분계리(참고) <b class="num">' + fmt(X.totals.sep, 1) + '</b></span></div></div>' +
+      '<div class="card"><div class="card-head"><h3>당월 사업비 배분</h3></div><div class="stack">' + stack + '</div><div class="legend" style="gap:8px 16px">' + allocLeg + '</div>' +
+      '<h3 style="margin-top:6px">신계약비 증가 기여 (전월 대비)</h3><div class="tbl-wrap"><table><thead><tr><th>부서 · 계정</th><th class="r">당월</th><th class="r">전월</th><th class="r">증감</th></tr></thead><tbody>' + drv + '</tbody></table></div></div>' +
+      '<div class="card"><div class="card-head"><h3>근거 전표 (귀속 신계약비 큰 순)</h3></div><div class="tbl-wrap"><table><thead><tr><th>일자</th><th>거래처</th><th>적요</th><th class="r">신계약 귀속</th></tr></thead><tbody>' + ev17 + '</tbody></table></div>' +
+      '<h3 style="margin-top:6px">변동표 대사 (계리 F31 vs TRACE)</h3><div class="tbl-wrap"><table><thead><tr><th>포트폴리오</th><th class="r">계리</th><th class="r">TRACE</th><th>판정</th></tr></thead><tbody>' + rec + '</tbody></table></div></div>' +
+      '</div></section>'));
+  }
+
+  // ---------- 재무 요약
+  var bsl = D.bs.map(function (r) { return r.period; });
+  app.appendChild(el('<section><div class="sec-head"><span class="eyebrow">BS · PL</span><h2>재무 요약</h2><span class="muted">BS 최근 12개월 월말 · PL 월별</span></div><div class="grid2">' +
+    '<div class="card"><div class="card-head"><h3>재무상태 추이</h3><div class="legend"><span><i style="background:var(--accent)"></i>자산총계</span><span><i style="background:var(--prev)"></i>부채총계</span></div></div>' +
+    lineChart({ label: "자산·부채 추이", labels: bsl, series: [{ values: D.bs.map(function (r) { return r.assets; }), color: "var(--accent)" }, { values: D.bs.map(function (r) { return r.liabilities; }), color: "var(--prev)" }] }) + '</div>' +
+    '<div class="card"><div class="card-head"><h3>자본총계 · 보험계약마진(CSM)</h3><div class="legend"><span><i style="background:var(--accent)"></i>CSM</span><span><i style="background:var(--budget)"></i>자본총계</span></div></div>' +
+    lineChart({ label: "자본·CSM 추이", labels: bsl, series: [{ values: D.bs.map(function (r) { return r.csm; }), color: "var(--accent)" }, { values: D.bs.map(function (r) { return r.equity; }), color: "var(--budget)" }] }) + '</div>' +
+    '<div class="card"><div class="card-head"><h3>월별 당기순이익</h3><div class="legend"><span><i style="background:var(--accent)"></i>당해</span><span><i style="background:var(--prev)"></i>전년</span></div></div>' +
+    barChart({ label: "월별 당기순이익", labels: D.pl.map(function (r) { return r.month; }), series: [{ name: "당해", values: D.pl.map(function (r) { return r.niCur; }), color: "var(--accent)" }, { name: "전년", values: D.pl.map(function (r) { return r.niPrev; }), color: "var(--prev)" }] }) + '</div>' +
+    '<div class="card"><div class="card-head"><h3>당해 손익 구성</h3><div class="legend"><span><i style="background:var(--accent)"></i>보험손익</span><span><i style="background:var(--budget)"></i>투자손익</span><span><i style="background:var(--crit)"></i>사업비</span></div></div>' +
+    barChart({ label: "손익 구성", labels: D.pl.map(function (r) { return r.month; }), series: [{ name: "보험손익", values: D.pl.map(function (r) { return r.insCur; }), color: "var(--accent)" }, { name: "투자손익", values: D.pl.map(function (r) { return r.invCur; }), color: "var(--budget)" }, { name: "사업비", values: D.pl.map(function (r) { return r.expCur; }), color: "var(--crit)" }] }) + '</div>' +
+    '</div></section>'));
+
+  app.appendChild(el('<footer>TRACE (Trend · Risk · Anomaly · Cause · Expense) · 원인 후보는 규칙 기반 가설입니다. 근거 전표와 담당 부서 확인으로 확정하세요. 원본: TRACE_v0.4 엑셀 → [대시보드 내보내기]로 생성된 data.js</footer>'));
+})();
+</script>
+</body>
+</html>
