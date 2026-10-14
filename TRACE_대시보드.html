@@ -297,6 +297,7 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   // ---------- 그리기 (불러온 자료로 화면 전체를 다시 그림)
   function render(D) {
   app.innerHTML = "";
+  window.TRACE_CURRENT = D;   // 챗봇이 지금 화면 자료를 요약해 보낼 때 씀
   var m = D.meta;
   var ok = function (s) { return /정상|일치/.test(s || ""); };
   app.appendChild(el('<header class="top"><div style="display:grid;gap:4px"><span class="eyebrow">사업비 원인추적기 · ' + esc(m.period) + ' 마감</span><h1>' + esc(m.company) + ' 사업비 대시보드<small>' + esc(m.period) + '</small></h1></div>' +
@@ -650,5 +651,6 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   else showEmpty("같은 폴더에 data.js가 없습니다. 위의 [자료 불러오기]로 TRACE 엑셀이나 data.js를 고르거나, 이 화면에 파일을 끌어다 놓으세요.");
 })();
 </script>
+<script src="chatbot.js"></script>
 </body>
 </html>
