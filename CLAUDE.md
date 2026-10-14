@@ -28,6 +28,7 @@ python src/build_trace.py                       # TRACE_v0.5.xlsx (+ src/tool_da
 python src/build_datajs.py                      # data.js
 EMBED_JSON=data.js python src/build_trace.py    # 결과 내장본으로 다시 생성 (엑셀만 올려도 대시보드가 읽음)
 python src/build_vba.py                         # modTrace.bas
+python src/build_xlsm.py                        # TRACE_v0.5.xlsm (매크로 내장, vbaProject.bin 직접 생성 · olevba로 구조 확인)
 python src/build_sample_fss.py                  # samples/샘플_감독원양식_2026-09.xlsx
 python src/build_forms.py                       # samples/TRACE_입력양식_v0.5.xlsx (본체 헤더설정에서 생성)
 python src/build_bundle.py                      # TRACE_v0.5_전체.zip (내려받기 페이지용 전체 묶음)

@@ -19,7 +19,8 @@ SAP 예산판·시산표(TB)·전표와 감독원 양식 BS·PL·보험계약부
 
 | 파일 | 내용 |
 |---|---|
-| `TRACE_v0.5.xlsx` | 본체. 입력 시트 7종, 헤더설정·입력옵션, 계정대체기준, 자가진단(33항목), 변동분석(분기 한도), 주의대상, 원인분석, IFRS17_사업비, 리포트, 대시보드 |
+| `TRACE_v0.5.xlsm` | **매크로 내장 본체 (권장).** 열면 설정 시트에 버튼 10개 자동 생성 |
+| `TRACE_v0.5.xlsx` | 본체 (매크로 없음). 입력 시트 7종, 헤더설정·입력옵션, 계정대체기준, 자가진단(33항목), 변동분석(분기 한도), 주의대상, 원인분석, IFRS17_사업비, 리포트, 대시보드 |
 | `modTrace.bas` | VBA 모듈 (CP949). 헤더 이름 불러오기 7종, 감독원 가로 양식 합치기, 대시보드 내보내기(data.js + 숨김 시트), 리포트 PDF |
 | `TRACE_대시보드.html` + `data.js` | HTML 대시보드. 상단 메뉴, 탭 5개, 엑셀(.xlsx·.xlsm)·data.js 업로드. 외부 리소스 없음 |
 | `TRACE_흐름.html` · `TRACE_IFRS17_연결.html` · `TRACE_사용설명서.html` · `TRACE_내려받기.html` | 처리 흐름, IFRS 17 연결 흐름, 사용설명서, 엑셀 양식·파일 내려받기 (상단 메뉴로 연결) |
@@ -37,10 +38,10 @@ SAP 예산판·시산표(TB)·전표와 감독원 양식 BS·PL·보험계약부
 
 ## 설치 (1회)
 
-1. `TRACE_v0.5.xlsx`를 열고 `Alt+F11` → [파일] → [파일 가져오기] → `modTrace.bas`
-2. `Alt+F8` → `SetupButtons` 실행 → 설정 시트에 버튼 10개가 생깁니다
-3. [다른 이름으로 저장] → **Excel 매크로 사용 통합 문서 (\*.xlsm)**
-4. `TRACE_대시보드.html`을 엑셀 파일과 같은 폴더에 둡니다
+1. `TRACE_v0.5.xlsm`을 열고 [콘텐츠 사용]을 누르면 설정 시트에 버튼 10개가 생깁니다 → 저장
+2. HTML 5개 + `trace.css` + `data.js`를 엑셀 파일과 같은 폴더에 둡니다
+
+`.xlsx`로 쓸 때: `Alt+F11` → [파일] → [파일 가져오기] → `modTrace.bas` → `Alt+F8` → `SetupButtons` → **.xlsm**으로 저장.
 
 ## 매월 사용
 
@@ -125,6 +126,7 @@ python src/build_trace.py                       # TRACE_v0.5.xlsx
 python src/build_datajs.py                      # data.js (엑셀 수식과 같은 로직)
 EMBED_JSON=data.js python src/build_trace.py    # 결과 내장본 (엑셀만 올려도 대시보드가 읽음)
 python src/build_vba.py                         # modTrace.bas
+python src/build_xlsm.py                        # TRACE_v0.5.xlsm (매크로 내장)
 python src/build_sample_fss.py                  # samples/샘플_감독원양식_2026-09.xlsx
 python src/build_forms.py                       # samples/TRACE_입력양식_v0.5.xlsx (본체 헤더설정에서 생성)
 python src/build_bundle.py                      # TRACE_v0.5_전체.zip (내려받기 페이지용 전체 묶음)

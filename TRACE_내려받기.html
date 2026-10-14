@@ -62,7 +62,8 @@ td:last-child { text-align: right; }
   <div class="tbl"><table>
     <thead><tr><th>파일</th><th>내용</th><th></th></tr></thead>
     <tbody>
-      <tr><th>TRACE_v0.5.xlsx</th><td>본체. 입력 시트 7종, 헤더설정·입력옵션, 계정대체기준, 자가진단, 변동분석(분기 한도), 주의대상, 원인분석, IFRS17_사업비, 리포트, 대시보드<br><span class="muted">매크로를 넣은 뒤 .xlsm으로 저장해서 씁니다 (사용설명서 › 처음 설치)</span></td><td><a class="dl" href="TRACE_v0.5.xlsx" data-src="dl/f0.js" download>받기</a></td></tr>
+      <tr><th>TRACE_v0.5.xlsm <span class="pill" style="background:var(--accent-soft);color:var(--accent)">권장</span></th><td>매크로가 들어 있는 본체. 열고 [콘텐츠 사용]을 누르면 설정 시트에 버튼 10개(불러오기 7종 · 보조수식 · 대시보드 내보내기 · 리포트 PDF)가 생깁니다. 한 번 저장하면 버튼이 남습니다<br><span class="muted">매크로를 따로 가져올 필요가 없습니다. 이 페이지(claude.ai)에서는 ZIP으로 받아지니 압축을 풀어 쓰세요</span></td><td><a class="dl" href="TRACE_v0.5.xlsm" data-src="dl/f4.js" data-name="TRACE_v0.5.xlsm.zip" download>받기</a></td></tr>
+      <tr><th>TRACE_v0.5.xlsx</th><td>본체. 입력 시트 7종, 헤더설정·입력옵션, 계정대체기준, 자가진단, 변동분석(분기 한도), 주의대상, 원인분석, IFRS17_사업비, 리포트, 대시보드<br><span class="muted">매크로 없는 판. modTrace.bas를 가져와 SetupButtons를 실행한 뒤 .xlsm으로 저장해서 씁니다</span></td><td><a class="dl" href="TRACE_v0.5.xlsx" data-src="dl/f0.js" download>받기</a></td></tr>
       <tr><th>TRACE_입력양식_v0.5.xlsx</th><td>입력 양식 7종 (예산판 · TB · 전표 · BS · PL · 예정사업비 · 부채변동표). TRACE 불러오기가 찾는 머리글과 예시 3행<br><span class="muted">노란 머리글 = 필수, 회색 = 선택. SAP에서 이 머리글로 내려받거나 붙여넣으세요</span></td><td><a class="dl" href="samples/TRACE_입력양식_v0.5.xlsx" data-src="dl/f1.js" download>받기</a></td></tr>
       <tr><th>샘플_감독원양식_2026-09.xlsx</th><td>예시 감독원 양식 (재무상태표 · 손익계산서 · 보험계약부채 변동표, 가로형)<br><span class="muted">입력옵션 'BS·PL 양식 형태' → 감독원 (가로)로 불러오는 예시</span></td><td><a class="dl" href="samples/샘플_감독원양식_2026-09.xlsx" data-src="dl/f2.js" download>받기</a></td></tr>
     </tbody></table></div>
@@ -71,7 +72,7 @@ td:last-child { text-align: right; }
   <div class="tbl"><table>
     <thead><tr><th>파일</th><th>내용</th><th></th></tr></thead>
     <tbody>
-      <tr><th>modTrace.bas</th><td>VBA 모듈 (CP949). 전체 묶음 ZIP에 들어 있습니다<br><span class="muted">메모장으로 다시 저장하면 한글이 깨지니 원본 그대로 가져오세요</span></td><td><a class="dl ghost" href="TRACE_v0.5_전체.zip" data-src="dl/f3.js" download>ZIP으로 받기</a></td></tr>
+      <tr><th>modTrace.bas</th><td>VBA 모듈 (CP949). .xlsm에 이미 들어 있으며, .xlsx에 넣을 때만 필요합니다. 전체 묶음 ZIP에 들어 있습니다<br><span class="muted">메모장으로 다시 저장하면 한글이 깨지니 원본 그대로 가져오세요</span></td><td><a class="dl ghost" href="TRACE_v0.5_전체.zip" data-src="dl/f3.js" download>ZIP으로 받기</a></td></tr>
       <tr><th>TRACE_대시보드.html + data.js</th><td>HTML 대시보드와 예시 결과. 같은 폴더에 두고 엽니다</td><td><a class="dl ghost" href="TRACE_v0.5_전체.zip" data-src="dl/f3.js" download>ZIP으로 받기</a></td></tr>
       <tr><th>처리 흐름 · IFRS 17 연결 · 사용설명서 · 내려받기</th><td>상단 메뉴로 연결된 설명 페이지 4개</td><td><a class="dl ghost" href="TRACE_v0.5_전체.zip" data-src="dl/f3.js" download>ZIP으로 받기</a></td></tr>
     </tbody></table></div>
@@ -108,7 +109,7 @@ td:last-child { text-align: right; }
       if (!dl || !a.getAttribute("data-src")) return;
       ev.preventDefault();
       if (a.getAttribute("aria-busy") === "true") return;
-      var name = decodeURIComponent(a.getAttribute("href").split("/").pop());
+      var name = a.getAttribute("data-name") || decodeURIComponent(a.getAttribute("href").split("/").pop());
       a.setAttribute("aria-busy", "true"); say(name + " 준비 중…");
       loadScript(a.getAttribute("data-src"), name).then(function () {
         return dl.save({ filename: name, data: toBlob(window.TRACE_FILES[name]) });

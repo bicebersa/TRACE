@@ -8,7 +8,8 @@ VBA = r'''Attribute VB_Name = "modTrace"
 Option Explicit
 
 ' TRACE 사업비 원인추적기 v0.5 - 매크로 모듈
-' 설치: Alt+F11 > [파일] > [파일 가져오기] > modTrace.bas  →  Alt+F8 > SetupButtons 실행  →  .xlsm으로 저장
+' 설치: TRACE_v0.5.xlsm에는 이미 들어 있음 (열면 설정 시트에 버튼 자동 생성)
+' .xlsx에 넣을 때: Alt+F11 > [파일] > [파일 가져오기] > modTrace.bas  →  Alt+F8 > SetupButtons 실행  →  .xlsm으로 저장
 ' 기능: 헤더 이름으로 불러오기(헤더설정 시트) / 보조수식 채우기 / 대시보드 데이터(data.js) 내보내기 (TOP 10 원인분석 포함) / 리포트 PDF
 
 Private Const FIRST_ROW As Long = 5
@@ -529,6 +530,15 @@ End Sub
 
 ' ---------------------------------------------------------------- 버튼
 Public Sub SetupButtons()
+    MakeButtons True
+End Sub
+
+' TRACE_v0.5.xlsm을 열 때 ThisWorkbook.Workbook_Open이 부릅니다. 버튼이 없을 때만 조용히 만듭니다.
+Public Sub EnsureButtons()
+    If ThisWorkbook.Worksheets("설정").Buttons.Count = 0 Then MakeButtons False
+End Sub
+
+Private Sub MakeButtons(ByVal announce As Boolean)
     Dim ws As Worksheet, b As Object, specs As Variant, i As Long, t As Double, l As Double
     Set ws = ThisWorkbook.Worksheets("설정")
     For Each b In ws.Buttons: b.Delete: Next b
@@ -543,7 +553,7 @@ Public Sub SetupButtons()
         b.OnAction = specs(i + 1)
         t = t + 32
     Next i
-    MsgBox "버튼 10개를 만들었습니다. 파일 형식을 'Excel 매크로 사용 통합 문서(*.xlsm)'로 저장하세요.", vbInformation, "TRACE"
+    If announce Then MsgBox "버튼 10개를 만들었습니다. 파일 형식을 'Excel 매크로 사용 통합 문서(*.xlsm)'로 저장하세요.", vbInformation, "TRACE"
 End Sub
 '''
 FMX = D["FM"]
