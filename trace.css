@@ -7,7 +7,7 @@
   --nav: #0d2420; --nav-ink: #e6efeb; --nav-dim: #9fb8af; --nav-on: #7fd6b6;
   --warn: #9a6512; --warn-soft: #fbefd9; --crit: #b4372f; --crit-soft: #f8e1dd; --info: #6b4fa0; --info-soft: #ece6f6;
   --csm: #2f5d9e; --csm-soft: #e2eaf7; --pl: #9a6512; --pl-soft: #fbefd9; --inv: #6b4fa0; --inv-soft: #ece6f6; --off: #87958f; --off-soft: #edf1ef;
-  --prev: #a3b5ae; --budget: #b07d1f;
+  --prev: #a3b5ae; --budget: #b07d1f; --inv2: #b3a1d6; --claim: #c0567a;
   --shadow: 0 1px 2px rgba(19, 33, 29, .05), 0 2px 8px rgba(19, 33, 29, .04);
   --font: "Pretendard", "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
   --mono: "D2Coding", Consolas, "SFMono-Regular", Menlo, ui-monospace, monospace;
@@ -21,7 +21,7 @@
     --nav: #070e0c; --nav-ink: #e2ebe6; --nav-dim: #8aa199; --nav-on: #6fd1ad;
     --warn: #e0a84a; --warn-soft: #33281a; --crit: #ef7a6e; --crit-soft: #3a1f1c; --info: #b49be0; --info-soft: #2a2238;
     --csm: #82a9e8; --csm-soft: #1b2638; --pl: #e0a84a; --pl-soft: #33281a; --inv: #b49be0; --inv-soft: #2a2238; --off: #6f7d78; --off-soft: #1c2522;
-    --prev: #5b6e66; --budget: #d9a441;
+    --prev: #5b6e66; --budget: #d9a441; --inv2: #6e5a94; --claim: #e88aa8;
     --shadow: 0 1px 2px rgba(0, 0, 0, .3);
     color-scheme: dark;
   }
@@ -32,7 +32,7 @@
   --nav: #070e0c; --nav-ink: #e2ebe6; --nav-dim: #8aa199; --nav-on: #6fd1ad;
   --warn: #e0a84a; --warn-soft: #33281a; --crit: #ef7a6e; --crit-soft: #3a1f1c; --info: #b49be0; --info-soft: #2a2238;
   --csm: #82a9e8; --csm-soft: #1b2638; --pl: #e0a84a; --pl-soft: #33281a; --inv: #b49be0; --inv-soft: #2a2238; --off: #6f7d78; --off-soft: #1c2522;
-  --prev: #5b6e66; --budget: #d9a441;
+  --prev: #5b6e66; --budget: #d9a441; --inv2: #6e5a94; --claim: #e88aa8;
   --shadow: 0 1px 2px rgba(0, 0, 0, .3);
   color-scheme: dark;
 }

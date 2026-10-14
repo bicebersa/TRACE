@@ -84,6 +84,13 @@ def main():
         for col, f in (("C", "cur"), ("D", "prevYear"), ("F", "prevMonth"), ("G", "qCur"), ("H", "qPrev"), ("I", "ytd"), ("J", "ytdPrev")):
             x = g("차트데이터", f"{col}{r}")
             if not isinstance(x, float) or abs(x - a[f]) > 0.06: bad.append(f"차트데이터 계정 {a['gl']} {col}: {x} vs {a[f]}")
+    for i, x_ in enumerate(data["expcat"]):   # 차트데이터 사업비 구성 (재무 요약)
+        r = CDL["CDI"] + 1 + i
+        for col, f in [(chr(66 + m), f"m{m + 1}") for m in range(12)] + [("N", "ytd"), ("P", "py"), ("Q", "diff")]:
+            v = g("차트데이터", f"{col}{r}")
+            if not isinstance(v, (int, float)) or abs(v - x_[f]) > 0.06: bad.append(f"차트데이터 사업비구성 {x_['cat']} {col}: {v} vs {x_[f]}")
+    tot_ = data["expcat"][-1]["ytd"]; kp_ = next(k for k in data["kpi"] if k["label"] == "사업비 누계")["value"]
+    if abs(tot_ - kp_) > 0.06: bad.append(f"사업비 구성 합계 {tot_} vs 사업비 누계 {kp_}")
     for i, kp in enumerate(data["kpi"]):
         x = g("차트데이터", f"B{CDL['CDG'] + 1 + i}")
         if not isinstance(x, float) or abs(x - kp["value"]) > 0.6: bad.append(f"KPI {kp['label']}: {x} vs {kp['value']}")

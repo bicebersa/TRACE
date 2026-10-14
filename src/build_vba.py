@@ -19,7 +19,7 @@ Private Const FIRST_ROW As Long = 5
 Public Sub FillAllHelpers()
     Application.ScreenUpdating = False
     Application.Calculation = xlCalculationManual
-    FillHelpers "전표_원본", 13, 33
+    FillHelpers "전표_원본", 13, 34
     FillHelpers "TB_원본", 9, 11
     FillHelpers "예산판_원본", 12, 18
     FillHelpers "BS_원본", 9, 11
@@ -62,6 +62,7 @@ Public Sub ExportDashboard()
     js = js & """accounts"": " & RowsJson("차트데이터", {CDD1}, {NGL}, Array("gl", "name", "cur", "prevYear", "diff", "prevMonth", "qCur", "qPrev", "ytd", "ytdPrev")) & "," & vbLf
     js = js & """bs"": " & RowsJson("차트데이터", {CDE1}, 12, Array("p", "period", "assets", "liabilities", "equity", "csm", "invested")) & "," & vbLf
     js = js & """pl"": " & RowsJson("차트데이터", {CDF1}, 12, Array("month", "niCur", "niPrev", "insCur", "invCur", "expCur", "insPrev")) & "," & vbLf
+    js = js & """expcat"": " & RowsJson("차트데이터", {CDI1}, 8, Array("cat", "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12", "ytd", "share", "py", "diff", "rate")) & "," & vbLf
     js = js & """burn"": " & RowsJson("차트데이터", {CDH1}, {NBURN1}, Array("rank", "dept", "account", "budget", "ytd", "slope", "icpt", "yearEnd", "tstar", "date", "status", "qdate", _
         "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12", "row", "qlim", "qact", "pySlope")) & "," & vbLf
     js = js & """ifrs17"": " & Ifrs17Json() & "," & vbLf
@@ -299,7 +300,7 @@ Public Sub ImportTB()
     ImportSource "TB_원본", {TB0}, {TBN}, {TBK}, 9, 11
 End Sub
 Public Sub ImportJournal()
-    ImportSource "전표_원본", {JE0}, {JEN}, {JEK}, 13, 33
+    ImportSource "전표_원본", {JE0}, {JEN}, {JEK}, 13, 34
 End Sub
 Public Sub ImportBS()
     If InStr(CStr(ThisWorkbook.Worksheets("입력옵션").Range("C13").Value), "감독원") > 0 Then
@@ -635,7 +636,7 @@ for k_, v_ in {"{SUMR}": IFL["SUMR"], "{A01}": IFL["A0"] + 1, "{B01}": IFL["B0"]
 for tag, nm in (("BP", "예산판_원본"), ("TB", "TB_원본"), ("JE", "전표_원본"), ("BS", "BS_원본"), ("PL", "PL_원본"), ("EX", "예정사업비"), ("RF", "부채변동표")):
     VBA = VBA.replace("{" + tag + "0}", str(FMX[nm][0])).replace("{" + tag + "N}", str(FMX[nm][1])).replace("{" + tag + "K}", str(FMX[nm][2]))
 rep = {"{CDG1}": CD["CDG"] + 1, "{NKPI}": CD["NKPI"], "{CDA1}": CD["CDA"] + 1, "{CDB1}": CD["CDB"] + 1, "{NDEPT}": CD["NDEPT"],
-       "{CDC1}": CD["CDC"] + 1, "{CDD1}": CD["CDD"] + 1, "{NGL}": CD["NGL"], "{CDE1}": CD["CDE"] + 1, "{CDF1}": CD["CDF"] + 1, "{CDH1}": CD["CDH"] + 1, "{NBURN1}": CD["NBURN"] + 1, "{AT}": AT}
+       "{CDC1}": CD["CDC"] + 1, "{CDD1}": CD["CDD"] + 1, "{NGL}": CD["NGL"], "{CDE1}": CD["CDE"] + 1, "{CDF1}": CD["CDF"] + 1, "{CDH1}": CD["CDH"] + 1, "{CDI1}": CD["CDI"] + 1, "{NBURN1}": CD["NBURN"] + 1, "{AT}": AT}
 for k, v in rep.items(): VBA = VBA.replace(k, str(v))
 assert "{" not in VBA.replace('"{', "").replace("{""", "") or True
 def kliteral(src):

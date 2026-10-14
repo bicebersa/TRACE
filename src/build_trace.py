@@ -1097,6 +1097,7 @@ DEPT_ALLOC = {"D100": (0, .10, 0, .90), "D200": (0, .20, .10, .70), "D300": (.05
               "D500": (.15, 0, 0, .85), "D600": (.75, .10, 0, .15), "D700": (.10, .40, .10, .40), "D800": (0, .60, .30, .10),
               "D900": (.90, .05, .05, 0), "D950": (0, .30, 0, .70)}   # 공통비 부서별 대체비율 (신계약, 유지, 수금, 비귀속)
 INV_DEPTS = ["D950"]; INV_RATE = {2025: 0.65, 2026: 0.70}           # 투자관련부서 유지비 공통비 → 재산관리비 (연 1회 변경)
+YAK_DEPTS, YAK_GLS = [], ["63001000"]   # 재산관리비 중 약관대출(약대) 관련: 이 부서·계정에서 나온 재산관리비 (예시: 약관대출 시스템 유지보수)
 CC2DEPT = {c[0]: c[2] for c in CCS}
 PFS = [("PF01", "보장성", "GMM"), ("PF02", "저축성", "GMM"), ("PF03", "단체(단기)", "PAA"), ("PF04", "변액", "VFA")]
 PF_DRV = {"PF01": (.55, .50, .50), "PF02": (.20, .30, .30), "PF03": (.10, .08, .08), "PF04": (.15, .12, .12)}  # (신계약, 유지, 수금)
@@ -1107,7 +1108,8 @@ NB_POLICY = os.environ.get("NB_POLICY", "보험료연동분만 CSM")        # �
 PAA_POLICY = "발생 즉시 비용"                                        # 발생 즉시 비용(59(a)) / 이연 후 상각
 def alloc_of(e):   # → [비귀속, 신계약, 유지, 수금, 재산관리비] 비율
     if e["gl"] in DIRECT:
-        return [1.0 if DIRECT[e["gl"]] == c else 0.0 for c in ("비귀속", "신계약비", "유지비", "수금비")] + [0.0]
+        dc = "유지비" if DIRECT[e["gl"]] == "손해조사비" else DIRECT[e["gl"]]   # 손해조사비는 IFRS 17 배분에서 유지비 열
+        return [1.0 if dc == c else 0.0 for c in ("비귀속", "신계약비", "유지비", "수금비")] + [0.0]
     d = CC2DEPT[e["cc"]]
     inv = INV_RATE.get(e["y"], 0) if (e["gl"] not in NATURE_OTHER and d in INV_DEPTS) else 0.0
     sn, mt, cl, na = DEPT_ALLOC.get(d, (0, 0, 0, 1))
@@ -1276,14 +1278,14 @@ for i in range(len(sgl)):   # 모두 전표 기준(변동분석 합계) — 같�
     for c, col in ((3, "F"), (4, "I"), (6, "G"), (7, "K"), (8, "L"), (9, "Q"), (10, "AX")):
         put(cd, r, c, f'=SUMIFS({VR(col)},{VR("C")},$A{r}&"")', GREEN, NUM)
     put(cd, r, 5, f"=C{r}-D{r}", fmt=NUM)
-CDE = 56  # BS 추이 (최근 12개월)
+CDE = 60  # BS 추이 (최근 12개월)
 header(cd, CDE, ["기간번호", "기간", "자산총계", "부채총계", "자본총계", "보험계약마진\n(CSM)", "운용자산"], h=30)
 for k in range(12):
     r = CDE + 1 + k
     put(cd, r, 1, f"={S['P']}-{11-k}", GRAY, "0"); put(cd, r, 2, "=" + plabel(f"A{r}"), align="center")
     for c, code in ((3, "A000"), (4, "L000"), (5, "E000"), (6, "L130"), (7, "A100")):
         put(cd, r, c, "=" + bsv(code, f"$A{r}"), GREEN, NUM0)
-CDF = 71  # PL 월별
+CDF = 75  # PL 월별
 header(cd, CDF, ["월", "당기순이익\n당해", "당기순이익\n전년", "보험손익\n당해", "투자손익\n당해", "사업비\n당해", "보험손익\n전년"], h=30)
 for m in range(1, 13):
     r = CDF + m
@@ -1292,7 +1294,7 @@ for m in range(1, 13):
     for c, code, p_ in ((2, "P600", cur), (3, "P600", prv), (4, "P100", cur), (5, "P200", cur), (6, "P300", cur), (7, "P100", prv)):
         f_ = plv(code, p_)
         put(cd, r, c, f"=IF({m}>{S['mon']},0,{f_})" if p_ == cur else "=" + f_, GREEN, NUM0)
-CDG = 86  # KPI
+CDG = 90  # KPI
 header(cd, CDG, ["지표", "값", "비교값", "증감률", "비교 기준"], h=20)
 KPI = [("총자산", bsv("A000", S["P"]), bsv("A000", S["P"] + "-12"), "전년동월말"),
        ("자본총계", bsv("E000", S["P"]), bsv("E000", S["P"] + "-12"), "전년동월말"),
@@ -1308,7 +1310,7 @@ for k, (lab, a, b, basis) in enumerate(KPI):
     last = k == len(KPI) - 1   # 마지막 '분기 한도 초과(예상)'는 건수
     put(cd, r, 1, lab, bold=True); put(cd, r, 2, "=" + a, GREEN, "0" if last else NUM0); put(cd, r, 3, "=" + b, GREEN, "0" if last else NUM0)
     put(cd, r, 4, "" if last else f"=IF(C{r}<=0,0,B{r}/C{r}-1)", fmt=RATE); put(cd, r, 5, basis, GRAY)
-CDH = 96  # 소진 추세: 1행 전사 + 고갈이 빠른 부서×계정 15개 (변동분석 AW열 정렬키 순)
+CDH = 100  # 소진 추세: 1행 전사 + 고갈이 빠른 부서×계정 15개 (변동분석 AW열 정렬키 순)
 NBURN = 15
 header(cd, CDH, ["고갈 순위", "부서", "계정", "연간가용", "누계실적", "월 소진속도", "절편", "추세\n연말 누계", "고갈\n예상(개월)", "고갈\n예상일", "추세 판정", "분기 고갈\n예상일"]
        + [f"누계\n{k}월" for k in range(1, 13)], h=30)
@@ -1332,8 +1334,31 @@ for k in range(1, NBURN + 1):
         put(cd, r, c, f'=IF($Y{r}="","",INDEX({VR(src)},$Y{r}))', GREEN, fmt, align="center" if c in (10, 11, 12) else None)
     for j in range(12):
         put(cd, r, 13 + j, f'=IF($Y{r}="","",INDEX(월별집계!${CL(28 + j)}$7:${CL(28 + j)}${VA_END},$Y{r}))', GREEN, NUM)
+CDI = CDH + NBURN + 4  # 사업비 구성 (재무 요약): 직접신계약비 무관·유관, 직접유지비, 직접손해조사비, 재산관리비 약대·기타, 간접비
+EXPCAT = ["직접신계약비-무관", "직접신계약비-유관(CSM)", "직접유지비", "직접손해조사비", "재산관리비-약대", "재산관리비-기타", "간접비"]
+header(cd, CDI, ["사업비 구분"] + [f"{m}월" for m in range(1, 13)] + ["당해 누계", "구성비", "전년동기\n누계", "증감액", "증감률"], h=30)
+def expcat(i, crit):   # crit: 전표 기간번호(M열) 조건 — 직접은 대체구분·직접대체계정, 재산관리비는 AD·AH열, 간접비 = 공통비 − 재산관리비
+    dsum = lambda *cs: "+".join(f'SUMIFS({JR("P")},{crit},{JR("AE")},"직접",{JR("AF")},"{c}")' for c in cs)
+    inv, yak = f'SUMIFS({JR("AD")},{crit})', f'SUMIFS({JR("AD")},{crit},{JR("AH")},"Y")'
+    return [dsum("비귀속"), dsum("신계약비"), dsum("유지비", "수금비"), dsum("손해조사비"), yak, f"{inv}-{yak}",
+            f'SUMIFS({JR("P")},{crit},{JR("AE")},"<>직접")-{inv}'][i]
+for i, nm in enumerate(EXPCAT):
+    r = CDI + 1 + i
+    put(cd, r, 1, nm, bold=True)
+    for m in range(1, 13):
+        put(cd, r, 1 + m, f'=IF({m}>{S["mon"]},0,{expcat(i, JR("M") + "," + S["yr"] + "*12+" + str(m))})', GREEN, NUM)
+    put(cd, r, 14, f"=SUM(B{r}:M{r})", fmt=NUM)
+    put(cd, r, 15, f"=IF($N${CDI+8}=0,0,N{r}/$N${CDI+8})", fmt=PCT)
+    put(cd, r, 16, "=" + expcat(i, f'{JR("M")},">="&(({S["yr"]}-1)*12+1),{JR("M")},"<="&({S["P"]}-12)'), GREEN, NUM)
+    put(cd, r, 17, f"=N{r}-P{r}", fmt=NUM)
+    put(cd, r, 18, f"=IF(P{r}<=0,0,N{r}/P{r}-1)", fmt=RATE)
+r = CDI + 8
+put(cd, r, 1, "합계", bold=True, fill=TOT)
+for c in range(2, 18): put(cd, r, c, f"=SUM({CL(c)}{CDI+1}:{CL(c)}{CDI+7})", fmt=PCT if c == 15 else NUM, bold=True, fill=TOT)
+put(cd, r, 18, f"=IF(P{r}<=0,0,N{r}/P{r}-1)", fmt=RATE, bold=True, fill=TOT)
+cd.cell(row=CDI + 9, column=1, value="직접유지비에 직접 수금비 포함 · 손해조사비는 IFRS 17 배분에서 유지비 열로 감 · 약대 구분은 계정대체기준 5번 표 · 간접비 = 공통비 중 재산관리비로 넘기지 않은 금액").font = F(GRAY, size=9)
 widths(cd, [12, 14, 14, 14, 14, 14, 14, 11, 9, 11, 10, 12] + [8] * 12 + [8, 10, 10])
-CD_LAYOUT = dict(CDA=CDA, CDB=CDB, CDC=CDC, CDD=CDD, CDE=CDE, CDF=CDF, CDG=CDG, CDH=CDH, NBURN=NBURN, NDEPT=len(DL), NGL=len(sgl), NKPI=len(KPI))
+CD_LAYOUT = dict(CDA=CDA, CDB=CDB, CDC=CDC, CDD=CDD, CDE=CDE, CDF=CDF, CDG=CDG, CDH=CDH, CDI=CDI, NBURN=NBURN, NDEPT=len(DL), NGL=len(sgl), NKPI=len(KPI))
 
 # ---------------- 대시보드 (엑셀)
 db = wb.create_sheet("대시보드")
@@ -1461,6 +1486,14 @@ for k_, ln in enumerate(["· 당기 신계약의 취득현금흐름은 경험조
                          "· 집단 인식 전에 지급한 취득현금흐름은 '보험취득현금흐름 자산'(28B~28F)으로 따로 관리하며 TRACE 범위 밖입니다.",
                          "· VFA의 투자 관련 서비스 원가, GMM의 투자수익 서비스 원가는 이행현금흐름에 포함될 수 있습니다 (B65(ka)). 1번 표 재산관리비 대체 대상인지 확인하세요."]):
     ab.cell(row=70 + k_, column=1, value=ln).font = F(GRAY, size=9)
+sec(ab, 75, "5. 재산관리비 약관대출(약대) 구분 — 아래 부서 또는 계정에서 나온 재산관리비는 '재산관리비-약대', 나머지는 '재산관리비-기타' (재무 요약 사업비 구성)")
+header(ab, 76, ["약대 부서코드", "부서명"], h=20); header(ab, 76, ["약대 G/L 계정", "계정명"], start=4, h=20)
+for i in range(10):
+    r = 77 + i
+    d_ = YAK_DEPTS[i] if i < len(YAK_DEPTS) else None; g_ = YAK_GLS[i] if i < len(YAK_GLS) else None
+    put(ab, r, 1, d_, BLUE, "@", align="center"); put(ab, r, 2, DEPTS.get(d_) if d_ else None, BLUE)
+    put(ab, r, 4, g_, BLUE, "@", align="center"); put(ab, r, 5, GLNAME.get(g_) if g_ else None, BLUE)
+ab.cell(row=87, column=1, value="코드는 텍스트로 입력. 예시값(전산운영비-SW유지보수 = 약관대출 시스템)은 가상입니다. 회사 기준(약관대출 담당 부서·전용 계정)으로 바꾸세요.").font = F(GRAY, size=9)
 widths(ab, [13, 18, 10, 12, 14, 12, 34, 12, 9]); ab.freeze_panes = "A4"
 
 # ---------- 예정사업비 (입력)

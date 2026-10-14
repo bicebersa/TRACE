@@ -8,7 +8,7 @@ Y, M = 2026, 9; P = Y * 12 + M; QS = Y * 12 + 7
 DEPTS = {"D100": "경영기획팀", "D200": "재무회계팀", "D300": "인사팀", "D400": "상품개발팀", "D500": "마케팅팀", "D600": "영업지원팀", "D700": "IT운영팀", "D800": "고객서비스팀", "D900": "영업채널팀", "D950": "자산운용팀"}
 GLN = {"62101000": "여비교통비-국내", "62102000": "여비교통비-해외", "62201000": "통신비", "62301000": "소모품비", "62401000": "도서인쇄비", "62501000": "회의비",
        "62601000": "업무추진비", "62701000": "광고선전비", "62801000": "교육훈련비-사내", "62802000": "교육훈련비-외부위탁", "62901000": "지급수수료-컨설팅",
-       "62902000": "지급수수료-기타", "63001000": "전산운영비-SW유지보수", "63002000": "전산운영비-클라우드", "63101000": "임차료", "63201000": "차량유지비", "63501000": "모집수수료", "63502000": "유지수수료"}
+       "62902000": "지급수수료-기타", "63001000": "전산운영비-SW유지보수", "63002000": "전산운영비-클라우드", "63101000": "임차료", "63201000": "차량유지비", "63501000": "모집수수료", "63502000": "유지수수료", "63601000": "손해조사비"}
 CC2D = {"1101": "D100", "1201": "D200", "1301": "D300", "1401": "D400", "1501": "D500", "1502": "D500", "1601": "D600", "1602": "D600", "1701": "D700", "1801": "D800", "1901": "D900", "1902": "D900", "1951": "D950"}
 KW = [("연간 일괄 계상", ["연간", "일시", "선급", "1년", "반기"], "연간·반기 계약을 한 번에 계상했을 가능성. 월할 안분 대상인지 확인"),
       ("캠페인·행사", ["캠페인", "행사", "이벤트", "프로모션", "박람회"], "일회성 캠페인·행사 비용일 가능성"),
@@ -237,15 +237,17 @@ kpi = [dict(label="총자산", value=bs[(P, "A000")], compare=bs[(P - 12, "A000"
             rate=kv(sum(v["K"] for v in VA.values()), sum(v["L"] for v in VA.values())), basis="전분기"),
        dict(label="분기 한도 초과(예상)", value=status[2]["count"] + status[3]["count"], compare=status[1]["count"], rate=None, basis="주의 건수")]
 # ---------------- IFRS17 (GMM) 사업비 영향
-DIRECT = {"63501000": "신계약비", "63502000": "수금비", "62701000": "비귀속"}
+DIRECT = {"63501000": "신계약비", "63502000": "수금비", "62701000": "비귀속", "63601000": "손해조사비"}
 NATURE_OTHER = {"62601000", "62801000", "62802000"}
 DEPT_ALLOC = {"D100": (0, .10, 0, .90), "D200": (0, .20, .10, .70), "D300": (.05, .15, 0, .80), "D400": (.50, .10, 0, .40),
               "D500": (.15, 0, 0, .85), "D600": (.75, .10, 0, .15), "D700": (.10, .40, .10, .40), "D800": (0, .60, .30, .10),
               "D900": (.90, .05, .05, 0), "D950": (0, .30, 0, .70)}
 INV_DEPTS = ["D950"]; INV_RATE = {2025: 0.65, 2026: 0.70}
+YAK_DEPTS, YAK_GLS = [], ["63001000"]   # 계정대체기준 5번 표 (재산관리비 약대 구분)
 def alloc_of(e):   # [비귀속, 신계약, 유지, 수금, 재산관리비]
     if e["gl"] in DIRECT:
-        return [1.0 if DIRECT[e["gl"]] == c else 0.0 for c in ("비귀속", "신계약비", "유지비", "수금비")] + [0.0]
+        dc = "유지비" if DIRECT[e["gl"]] == "손해조사비" else DIRECT[e["gl"]]
+        return [1.0 if dc == c else 0.0 for c in ("비귀속", "신계약비", "유지비", "수금비")] + [0.0]
     dd = CC2D[e["cc"]]
     inv = INV_RATE.get(e["y"], 0) if (e["gl"] not in NATURE_OTHER and dd in INV_DEPTS) else 0.0
     sn, mt, cl, na = DEPT_ALLOC.get(dd, (0, 0, 0, 1))
@@ -315,8 +317,31 @@ summary17 = (f"GMM CSM 당월 변동 {sg(csm_chg, 0)} 중 사업비 관련 {sg(c
 ifrs17 = dict(summary=summary17, alloc=alloc, pf=pfrows, totals=dict(csm=tcsm, csmVfa=tvfa, pl=tpl), recon=recon, bridge=bridge, bridgeVfa=bridgeV,
               csmChange=csm_chg, csmExpense=csm_exp, csmChangeVfa=vcsm_chg, csmExpenseVfa=vcsm_exp, drivers=[{k: v for k, v in d.items() if k != "sk"} for d in drivers], evidence=evidence17)
 
+# ---------------- 사업비 구성 (재무 요약) — 엑셀 차트데이터 CDI 블록과 같음
+EXPCAT = ["직접신계약비-무관", "직접신계약비-유관(CSM)", "직접유지비", "직접손해조사비", "재산관리비-약대", "재산관리비-기타", "간접비"]
+def ecat(e):   # → [(구분 번호, 금액)]
+    if e["gl"] in DIRECT:
+        return [({"비귀속": 0, "신계약비": 1, "유지비": 2, "수금비": 2, "손해조사비": 3}[DIRECT[e["gl"]]], e["v"])]
+    inv = e["al"][4]; yak = inv if (CC2D[e["cc"]] in YAK_DEPTS or e["gl"] in YAK_GLS) else 0.0
+    return [(4, yak), (5, inv - yak), (6, e["v"] - inv)]
+def ecsum(p0, p1):
+    t = [0.0] * 7
+    for e in E:
+        if p0 <= e["p"] <= p1:
+            for i, a in ecat(e): t[i] += a
+    return t
+EM = [ecsum(Y * 12 + m, Y * 12 + m) if m <= M else [0.0] * 7 for m in range(1, 13)]
+EPY = ecsum((Y - 1) * 12 + 1, P - 12)
+expcat = []
+for i, nm in enumerate(EXPCAT + ["합계"]):
+    ms = [sum(EM[m][:7]) if i == 7 else EM[m][i] for m in range(12)]
+    py = sum(EPY) if i == 7 else EPY[i]
+    expcat.append(dict(cat=nm, **{f"m{m + 1}": ms[m] for m in range(12)}, ytd=sum(ms), py=py, diff=sum(ms) - py, rate=0 if py <= 0 else sum(ms) / py - 1))
+for x in expcat: x["share"] = x["ytd"] / expcat[-1]["ytd"] if expcat[-1]["ytd"] else 0
+expcat = [{k: x[k] for k in ["cat"] + [f"m{m}" for m in range(1, 13)] + ["ytd", "share", "py", "diff", "rate"]} for x in expcat]
+
 data = dict(meta=dict(company=os.environ.get("COMPANY", "예시보험㈜"), period=plab(P), unit="백만원", burnMethod=BURN_METHOD, check="전체 정상 (참고 1건)", recon="전체 일치", generated="2026-10-14 (예시 데이터)"),
-            kpi=kpi, monthly=monthly, depts=depts, status=status, accounts=accounts, bs=bsrows, pl=plrows, burn=burnrows, top10=top10, ifrs17=ifrs17)
+            kpi=kpi, monthly=monthly, depts=depts, status=status, accounts=accounts, bs=bsrows, pl=plrows, expcat=expcat, burn=burnrows, top10=top10, ifrs17=ifrs17)
 def rnd(o):
     if isinstance(o, float): return round(o, 4)
     if isinstance(o, dict): return {k: rnd(v) for k, v in o.items()}

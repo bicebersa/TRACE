@@ -215,6 +215,30 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
     }
     return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(o.label) + '">' + g + '</svg>';
   }
+  function stackChart(o) {   // 누적 막대 (월별 사업비 구성)
+    var W = 560, H = 250, L = 52, R = 8, T = 10, B = 26, n = o.labels.length;
+    var tot = o.labels.map(function (_, i) { return o.series.reduce(function (a, s) { return a + Math.max(0, s.values[i] || 0); }, 0); });
+    var max = niceMax(Math.max.apply(null, tot.concat([0])));
+    var cw = (W - L - R) / n, bw = Math.min(30, cw - 10);
+    var y = function (v) { return T + (H - T - B) * (1 - v / max); };
+    var g = "";
+    for (var i = 0; i <= 4; i++) {
+      var v = max * i / 4, yy = y(v);
+      g += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + yy + '" y2="' + yy + '" stroke="var(--grid)"/>';
+      g += '<text x="' + (L - 6) + '" y="' + (yy + 4) + '" text-anchor="end">' + fmt(v) + '</text>';
+    }
+    o.labels.forEach(function (lab, i) {
+      var x0 = L + cw * i + (cw - bw) / 2, acc = 0;
+      o.series.forEach(function (s) {
+        var v = Math.max(0, s.values[i] || 0); if (!v) return;
+        g += '<rect x="' + x0 + '" y="' + y(acc + v) + '" width="' + bw + '" height="' + (y(acc) - y(acc + v)) + '" fill="' + s.color + '"><title>' + esc(lab + " " + s.name + ": " + fmt(v, 1)) + '</title></rect>';
+        acc += v;
+      });
+      if (acc) g += '<text x="' + (x0 + bw / 2) + '" y="' + (y(acc) - 4) + '" text-anchor="middle" class="num" style="font-size:10px">' + fmt(acc) + '</text>';
+      g += '<text x="' + (L + cw * i + cw / 2) + '" y="' + (H - 8) + '" text-anchor="middle">' + esc(lab) + '</text>';
+    });
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(o.label) + '">' + g + '</svg>';
+  }
   function lineChart(o) {
     var W = 560, H = 230, L = 64, R = 10, T = 10, B = 26, n = o.labels.length;
     var all = []; o.series.forEach(function (s) { all = all.concat(s.values); });
@@ -513,7 +537,7 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
         return '<td class="r ' + (r.diff < 0 ? "up" : "") + '">' + (r.diff > 0 ? "+" : "") + fmt(r.diff, 1) + '<br><span class="tgt ' + tcls(r.target) + '">' + esc(r.target.replace("(보험서비스결과)", "").replace(" · 나머지 손익", "")) + '</span>' + split + '</td>';
       }).join("") + '</tr>';
     }).join("");
-    var acol = { "비귀속": "var(--prev)", "신계약비": "var(--csm)", "유지비": "var(--accent)", "수금비": "var(--budget)" };
+    var acol = { "비귀속": "var(--prev)", "신계약비": "var(--csm)", "유지비": "var(--accent)", "수금비": "var(--budget)", "재산관리비": "var(--inv)" };
     var stack = X.alloc.map(function (a) { return '<span title="' + esc(a.cat + " " + fmt(a.cur, 1)) + '" style="width:' + ((a.share || 0) * 100).toFixed(2) + '%;background:' + acol[a.cat] + '"></span>'; }).join("");
     var allocLeg = X.alloc.map(function (a) { return '<span><i style="background:' + acol[a.cat] + '"></i>' + esc(a.cat) + ' <b class="num">' + fmt(a.cur, 1) + '</b> (' + pct(a.share) + ')</span>'; }).join("");
     var drv = X.drivers.filter(function (d) { return d.dept; }).map(function (d) {
@@ -541,6 +565,26 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   }
 
   // ---------- 재무 요약
+  function expcatCard(D) {   // 사업비 구성: 직접신계약비 무관·유관, 직접유지비, 직접손해조사비, 재산관리비 약대·기타, 간접비
+    var E = (D.expcat || []).filter(function (r) { return r.cat && r.cat !== "합계"; });
+    if (!E.length) return "";
+    var T = (D.expcat || []).filter(function (r) { return r.cat === "합계"; })[0];
+    var EC = { "직접신계약비-무관": "var(--pl)", "직접신계약비-유관(CSM)": "var(--csm)", "직접유지비": "var(--accent)", "직접손해조사비": "var(--claim)",
+      "재산관리비-약대": "var(--inv)", "재산관리비-기타": "var(--inv2)", "간접비": "var(--prev)" };
+    var mon = +(String(D.meta.period || "").split("-")[1]) || 12, labs = [];
+    for (var m = 1; m <= mon; m++) labs.push(m + "월");
+    var series = E.map(function (r) { return { name: r.cat, color: EC[r.cat] || "var(--off)", values: labs.map(function (_, i) { return +r["m" + (i + 1)] || 0; }) }; });
+    var leg = E.map(function (r) { return '<span><i style="background:' + (EC[r.cat] || "var(--off)") + '"></i>' + esc(r.cat) + '</span>'; }).join("");
+    var tr = function (r, tot) {
+      return '<tr' + (tot ? ' style="font-weight:600;border-top:2px solid var(--line)"' : '') + '><td>' + (tot ? '<b>합계</b>' : '<i style="display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;background:' + (EC[r.cat] || "var(--off)") + '"></i>' + esc(r.cat)) + '</td><td class="r">' + fmt(r.ytd, 1) +
+        '</td><td class="r">' + pct(r.share) + '</td><td class="r">' + fmt(r.py, 1) + '</td><td class="r">' + samt(r.diff) + '</td><td class="r">' + (r.py > 0 ? pct(r.rate, true) : "-") + '</td></tr>';
+    };
+    return '<div class="card" style="margin-top:16px"><div class="card-head"><h3>사업비 구성 (IFRS 17 분류)</h3><div class="legend">' + leg + '</div></div>' +
+      '<div class="grid2"><div>' + stackChart({ label: "월별 사업비 구성", labels: labs, series: series }) + '</div>' +
+      '<div class="tbl-wrap"><table><thead><tr><th>구분</th><th class="r">당해 누계</th><th class="r">구성비</th><th class="r">전년동기 누계</th><th class="r">증감액</th><th class="r">증감률</th></tr></thead><tbody>' +
+      E.map(function (r) { return tr(r); }).join("") + (T ? tr(T, true) : "") + '</tbody></table>' +
+      '<p class="muted" style="font-size:12px;margin-top:8px">직접신계약비-유관은 계약집단에 귀속되는 취득현금흐름(이행현금흐름·CSM), 무관은 귀속되지 않아 당기비용. 직접유지비에 수금비 포함. 재산관리비 약대 구분은 계정대체기준 5번 표. 간접비 = 공통비 중 재산관리비로 넘기지 않은 금액. 단위: ' + esc(D.meta.unit || "") + '</p></div></div></div>';
+  }
   var bsl = D.bs.map(function (r) { return r.period; });
   app.appendChild(el('<section data-tab="finance"><div class="sec-head"><span class="eyebrow">BS · PL</span><h2>재무 요약</h2><span class="muted">BS 최근 12개월 월말 · PL 월별</span></div><div class="grid2">' +
     '<div class="card"><div class="card-head"><h3>재무상태 추이</h3><div class="legend"><span><i style="background:var(--accent)"></i>자산총계</span><span><i style="background:var(--prev)"></i>부채총계</span></div></div>' +
@@ -551,7 +595,7 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
     barChart({ label: "월별 당기순이익", labels: D.pl.map(function (r) { return r.month; }), series: [{ name: "당해", values: D.pl.map(function (r) { return r.niCur; }), color: "var(--accent)" }, { name: "전년", values: D.pl.map(function (r) { return r.niPrev; }), color: "var(--prev)" }] }) + '</div>' +
     '<div class="card"><div class="card-head"><h3>당해 손익 구성</h3><div class="legend"><span><i style="background:var(--accent)"></i>보험손익</span><span><i style="background:var(--budget)"></i>투자손익</span><span><i style="background:var(--crit)"></i>사업비</span></div></div>' +
     barChart({ label: "손익 구성", labels: D.pl.map(function (r) { return r.month; }), series: [{ name: "보험손익", values: D.pl.map(function (r) { return r.insCur; }), color: "var(--accent)" }, { name: "투자손익", values: D.pl.map(function (r) { return r.invCur; }), color: "var(--budget)" }, { name: "사업비", values: D.pl.map(function (r) { return r.expCur; }), color: "var(--crit)" }] }) + '</div>' +
-    '</div></section>'));
+    '</div>' + expcatCard(D) + '</section>'));
 
   app.appendChild(el('<footer>TRACE (Trend · Risk · Anomaly · Cause · Expense) · 원인 후보는 규칙 기반 가설입니다. 근거 전표와 담당 부서 확인으로 확정하세요. 원본: TRACE 엑셀 → [대시보드 내보내기]로 생성된 data.js</footer>'));
   if (!app.dataset.wired) { app.dataset.wired = "1"; app.addEventListener("click", function (e) {
@@ -695,6 +739,7 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
       D.accounts = after(cd, "G/L 계정", ["gl", "name", "cur", "prevYear", "diff", "prevMonth", "qCur", "qPrev", "ytd", "ytdPrev"]);
       D.bs = after(cd, "기간번호", ["p", "period", "assets", "liabilities", "equity", "csm", "invested"], 1, 12);
       D.pl = after(cd, "월", ["month", "niCur", "niPrev", "insCur", "invCur", "expCur", "insPrev"], 2, 12);
+      D.expcat = after(cd, "사업비 구분", ["cat", "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12", "ytd", "share", "py", "diff", "rate"], 1, 8);
       D.burn = after(cd, "고갈 순위", ["rank", "dept", "account", "budget", "ytd", "slope", "icpt", "yearEnd", "tstar", "date", "status", "qdate",
         "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12"], 1, 16);
       var selKey = ca.C9, noCause = { summary: "원인 상세는 엑셀에서 [대시보드 내보내기]를 실행하고 저장한 파일, 또는 data.js를 올리면 TOP 10 모두 표시됩니다. 지금은 원인분석 시트에서 선택된 항목만 보입니다.", candidates: [], vendors: [], evidence: [] };
