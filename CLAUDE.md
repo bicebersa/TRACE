@@ -60,6 +60,7 @@ python src/build_bundle.py                      # TRACE_v0.5_전체.zip (내려�
 - IFRS 4 시절 용어 '사업비차익'은 쓰지 않는다. '사업비 예실차(예상 대비 실제)'.
 
 ## 검증 방법
+- **사용자 윈도우 PC(엑셀 설치)에서는 `py tools/verify.py --excel`** — 엑셀(COM, PowerShell)이 직접 계산해 1분 안팎. pywin32·formulas 불필요.
 - 이 개발 환경에는 엑셀·LibreOffice가 없을 수 있다. `python tools/verify.py`로 수식을 계산·대조한다 (전표 범위를 줄인 사본으로 10분 안팎, 메모리 8GB면 **한 번에 하나씩** 실행).
 - `formulas` 라이브러리는 `TEXT(x,"+0%")`의 `+` 부호, `TEXT(0,"#,##0.0")`를 잘못 표시한다. 이 차이는 엑셀과 무관하다.
 - VBA는 엑셀이 없어 실행 검증을 못 했다. 사용자가 내부망에서 처음 돌릴 때 나온 오류 문장을 받아 고친다.

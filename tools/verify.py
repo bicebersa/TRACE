@@ -4,6 +4,7 @@
   pip install openpyxl formulas
   python tools/verify.py                         # 원인분석 1순위 기준
   python tools/verify.py --sel D200,62901000,전월  # 원인분석을 특정 부서·계정으로 지정해 패턴 문장까지 확인
+  py tools/verify.py --excel                     # (윈도우 + 엑셀) 엑셀이 직접 계산 → 1분 안팎. formulas 불필요
 
 엑셀·LibreOffice 없이 검증하는 용도다. 메모리 8GB면 한 번에 하나만 실행한다 (10분 안팎).
 formulas는 TEXT(x,"+0%")의 + 부호와 TEXT(0,"#,##0.0")를 잘못 표시하므로 그 차이는 무시해도 된다.
@@ -31,6 +32,7 @@ sys.stdout.flush(); os._exit(0)
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sel", default="", help="원인분석 직접 지정: 부서코드,G/L,비교기준")
+    ap.add_argument("--excel", action="store_true", help="설치된 엑셀로 계산 (윈도우). formulas보다 훨씬 빠르고 실제 엑셀 결과와 같음")
     a = ap.parse_args()
     os.makedirs(OUT, exist_ok=True)
     env = dict(os.environ, JE_END="6000", SEL=a.sel)
@@ -38,14 +40,47 @@ def main():
     subprocess.run([sys.executable, os.path.join(SRC, "build_trace.py"), OUT], check=True, env=env)
     book = [f for f in os.listdir(OUT) if f.startswith("TRACE_v") and f.endswith(".xlsx")][0]
     sol = os.path.join(OUT, "sol.json")
-    print("2/3 수식 계산 (수 분 걸림)")
-    with open(os.path.join(OUT, "_eval.py"), "w", encoding="utf-8") as fh: fh.write(EVAL)
-    rr = subprocess.run([sys.executable, os.path.join(OUT, "_eval.py"), os.path.join(OUT, book), sol], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
-    if rr.returncode != 0:   # 계산 단계 오류는 원인 몇 줄만 보여 주고 멈춤 (예: formulas 미설치)
-        print("수식 계산 실패. 마지막 오류:\n" + "\n".join(rr.stderr.strip().splitlines()[-6:]))
-        if "No module named" in rr.stderr: print("→ 'py -m pip install openpyxl formulas' 를 실행한 뒤 다시 해 보세요.")
-        sys.exit(1)
+    if a.excel:
+        excel_calc(os.path.join(OUT, book), sol, book)
+    else:
+        formulas_calc(book, sol)
     print("3/3 대조")
+    compare(book, sol)
+
+
+def excel_calc(path, sol, book):
+    """엑셀(COM)로 열어 전체 다시 계산 → 저장 → openpyxl로 계산값을 읽어 formulas 결과와 같은 모양(sol.json)으로 씀."""
+    import time, openpyxl
+    t0 = time.time()
+    print("2/3 엑셀로 수식 계산 (엑셀 창은 뜨지 않음)")
+    calc = os.path.join(OUT, "calc_" + book)
+    ps = ("$ErrorActionPreference='Stop'; $x=New-Object -ComObject Excel.Application; $x.Visible=$false; $x.DisplayAlerts=$false; "
+          f"try {{ $w=$x.Workbooks.Open('{path}'); $x.CalculateFull(); $w.SaveAs('{calc}', 51); $w.Close($false) }} finally {{ $x.Quit() }}")
+    rr = subprocess.run(["powershell", "-NoProfile", "-Command", ps], capture_output=True, text=True, errors="replace")
+    if rr.returncode != 0 or not os.path.exists(calc):
+        print("엑셀 계산 실패 (엑셀이 설치된 윈도우에서만 됩니다):\n" + (rr.stderr or rr.stdout).strip()[-800:]); sys.exit(1)
+    wb = openpyxl.load_workbook(calc, data_only=True, read_only=True)
+    tag, out = "[" + book.upper() + "]", {}
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for c in row:
+                if c.value is not None and hasattr(c, "coordinate"): out[f"'{tag}{ws.title.upper()}'!{c.coordinate}"] = str(c.value)
+    json.dump(out, open(sol, "w", encoding="utf-8"), ensure_ascii=False)
+    print(f"   엑셀 계산·읽기 {time.time() - t0:.0f}초")
+
+
+def formulas_calc(book, sol):
+    print("2/3 수식 계산 (수 분 걸림)")
+    if True:
+        with open(os.path.join(OUT, "_eval.py"), "w", encoding="utf-8") as fh: fh.write(EVAL)
+        rr = subprocess.run([sys.executable, os.path.join(OUT, "_eval.py"), os.path.join(OUT, book), sol], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+        if rr.returncode != 0:   # 계산 단계 오류는 원인 몇 줄만 보여 주고 멈춤 (예: formulas 미설치)
+            print("수식 계산 실패. 마지막 오류:\n" + "\n".join(rr.stderr.strip().splitlines()[-6:]))
+            if "No module named" in rr.stderr: print("→ 'py -m pip install openpyxl formulas' 를 실행한 뒤 다시 해 보세요.")
+            sys.exit(1)
+
+
+def compare(book, sol):
     o = json.load(open(sol, encoding="utf-8"))
     tag = "[" + book.upper() + "]"
     def g(sh, c):
