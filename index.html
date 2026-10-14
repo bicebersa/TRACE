@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TRACE 도우미</title>
+<link rel="icon" href="data:,">
+<style>
+/* 챗봇 화면: 상단 바(모델 선택·새 대화) → 대화 → 입력창. 색은 TRACE 대시보드와 같은 토큰 */
+:root {
+  --bg: #f3f5f4; --surface: #ffffff; --ink: #16231f; --muted: #5b6b66; --line: #d5ddd9; --grid: #e6ebe8;
+  --accent: #17705a; --accent-soft: #e1f0ea; --warn: #9a6512; --warn-soft: #fbf0dc; --crit: #b4372f; --crit-soft: #f8e2df;
+  --font: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  --mono: Consolas, "SFMono-Regular", Menlo, ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #2a3833; --grid: #222d29;
+    --accent: #4fbf9a; --accent-soft: #183128; --warn: #e0a84a; --warn-soft: #33281a; --crit: #ef7a6e; --crit-soft: #3a1f1c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #2a3833; --grid: #222d29;
+  --accent: #4fbf9a; --accent-soft: #183128; --warn: #e0a84a; --warn-soft: #33281a; --crit: #ef7a6e; --crit-soft: #3a1f1c; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14.5px; line-height: 1.6; display: flex; flex-direction: column; }
+button, select, textarea, input { font: inherit; color: inherit; }
+
+header { border-bottom: 1px solid var(--line); background: var(--surface); padding: 10px 16px; }
+.bar { max-width: 860px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.brand { display: grid; margin-right: auto; }
+.brand b { font-size: 16px; }
+.brand span { font-size: 12px; color: var(--muted); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+select, .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+.btn { cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+:root[data-theme="dark"] .btn.primary { color: #0f1513; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.primary { color: #0f1513; } }
+.btn:disabled { opacity: .5; cursor: default; }
+nav.links { font-size: 12.5px; display: flex; gap: 10px; }
+nav.links a { color: var(--muted); }
+
+main { flex: 1; overflow-y: auto; padding: 20px 16px; }
+.log { max-width: 860px; margin: 0 auto; display: grid; gap: 14px; }
+.msg { display: grid; gap: 4px; min-width: 0; }
+.msg .who { font-size: 12px; color: var(--muted); font-weight: 700; }
+.msg .body { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; overflow-wrap: anywhere; min-width: 0; }
+.msg.user { justify-items: end; }
+.msg.user .body { background: var(--accent-soft); border-color: transparent; white-space: pre-wrap; max-width: 85%; }
+.msg.error .body { background: var(--crit-soft); border-color: transparent; color: var(--crit); }
+.body > :first-child { margin-top: 0; } .body > :last-child { margin-bottom: 0; }
+.body pre { background: var(--grid); border-radius: 8px; padding: 10px 12px; overflow-x: auto; font-family: var(--mono); font-size: 13px; }
+.body code { font-family: var(--mono); font-size: .92em; }
+.body :not(pre) > code { background: var(--grid); border-radius: 4px; padding: 1px 4px; }
+.body table { border-collapse: collapse; display: block; overflow-x: auto; font-size: 13px; }
+.body th, .body td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; }
+.body a { color: var(--accent); }
+.typing { color: var(--muted); font-size: 13px; }
+.typing::after { content: "…"; animation: blink 1.2s steps(3, end) infinite; }
+@keyframes blink { 0% { opacity: .2; } 50% { opacity: 1; } 100% { opacity: .2; } }
+
+.welcome { max-width: 860px; margin: 0 auto; display: grid; gap: 14px; padding-top: 8vh; text-align: center; }
+.welcome h1 { margin: 0; font-size: 22px; }
+.welcome p { margin: 0; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+.chip:hover { border-color: var(--accent); color: var(--accent); }
+
+footer { border-top: 1px solid var(--line); background: var(--surface); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+.composer { max-width: 860px; margin: 0 auto; display: grid; gap: 6px; }
+.row { display: flex; gap: 8px; align-items: flex-end; }
+textarea { flex: 1; min-width: 0; resize: none; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: var(--bg); max-height: 200px; line-height: 1.5; }
+textarea:focus, input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.note { font-size: 11.5px; color: var(--muted); }
+.note b { color: var(--warn); }
+.code-row { display: flex; gap: 8px; align-items: center; font-size: 13px; }
+.code-row input { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: var(--bg); width: 160px; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand"><b>TRACE 도우미</b><span>사업비 원인추적기 사용법 · 사업비 · IFRS 17 질문</span></div>
+    <div class="controls">
+      <select id="model" aria-label="모델"></select>
+      <button class="btn" id="reset" type="button">새 대화</button>
+    </div>
+    <nav class="links">
+      <a href="TRACE_대시보드.html">대시보드</a>
+      <a href="TRACE_흐름.html">흐름</a>
+      <a href="TRACE_IFRS17_연결.html">IFRS17 연결</a>
+      <a href="TRACE_사용설명서.html">사용설명서</a>
+    </nav>
+  </div>
+</header>
+
+<main id="scroller">
+  <div class="welcome" id="welcome">
+    <h1>무엇이 궁금하세요?</h1>
+    <p>TRACE 설치·월간 사용 순서, 입력 양식 바꾸기, 원인 추정 규칙, IFRS 17 연결을 물어보세요.</p>
+    <div class="chips" id="chips"></div>
+  </div>
+  <div class="log" id="log"></div>
+</main>
+
+<footer>
+  <form class="composer" id="form">
+    <div class="code-row" id="codeRow" hidden>
+      <label for="code">접속 코드</label><input id="code" type="password" autocomplete="off">
+    </div>
+    <div class="row">
+      <textarea id="input" rows="1" placeholder="메시지 입력 (Enter 보내기, Shift+Enter 줄바꿈)"></textarea>
+      <button class="btn primary" id="send" type="submit">보내기</button>
+      <button class="btn" id="stop" type="button" hidden>중지</button>
+    </div>
+    <div class="note"><b>실제 업무 데이터(금액·거래처·전표)는 입력하지 마세요.</b> 외부 무료 모델(OpenRouter · NVIDIA Nemotron)로 전송되며, 무료 모델은 입력 내용이 제공사에 기록될 수 있습니다.</div>
+  </form>
+</footer>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const els = { log: $('log'), welcome: $('welcome'), chips: $('chips'), model: $('model'), reset: $('reset'), form: $('form'),
+    input: $('input'), send: $('send'), stop: $('stop'), scroller: $('scroller'), codeRow: $('codeRow'), code: $('code') };
+
+  const STORE = 'trace-chat-v1';
+  const store = {
+    get() { try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch { return {}; } },
+    set(v) { try { localStorage.setItem(STORE, JSON.stringify(v)); } catch {} },
+  };
+  const saved = store.get();
+  let messages = Array.isArray(saved.messages) ? saved.messages : [];
+  let controller = null;
+
+  const SUGGESTIONS = [
+    '처음 설치는 어떻게 하나요?',
+    '매월 사용 순서를 알려줘',
+    '자가진단이 정상이 아니면 뭘 봐야 해?',
+    '원인 추정 규칙을 표로 정리해줘',
+    '사업비가 CSM에 반영되는 흐름은?',
+    'SAP 전표 양식의 열 이름이 다르면?',
+  ];
+
+  function save() { store.set({ messages, model: els.model.value, code: els.code.value }); }
+
+  function render(md) {
+    if (window.marked && window.DOMPurify) return DOMPurify.sanitize(marked.parse(md, { breaks: true }));
+    const div = document.createElement('div');
+    div.style.whiteSpace = 'pre-wrap';
+    div.textContent = md;
+    return div.outerHTML;
+  }
+
+  function addBubble(role, text) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ' + role;
+    const who = document.createElement('div');
+    who.className = 'who';
+    who.textContent = role === 'user' ? '나' : role === 'error' ? '오류' : 'TRACE 도우미';
+    const body = document.createElement('div');
+    body.className = 'body';
+    if (role === 'assistant') body.innerHTML = render(text);
+    else body.textContent = text;
+    wrap.append(who, body);
+    els.log.append(wrap);
+    els.welcome.hidden = true;
+    return body;
+  }
+
+  const nearBottom = () => els.scroller.scrollHeight - els.scroller.scrollTop - els.scroller.clientHeight < 80;
+  const toBottom = () => { els.scroller.scrollTop = els.scroller.scrollHeight; };
+
+  function redraw() {
+    els.log.replaceChildren();
+    els.welcome.hidden = messages.length > 0;
+    messages.forEach((m) => addBubble(m.role, m.content));
+    toBottom();
+  }
+
+  function setBusy(busy) {
+    els.send.hidden = busy;
+    els.stop.hidden = !busy;
+    els.input.disabled = busy;
+    els.model.disabled = busy;
+    els.reset.disabled = busy;
+  }
+
+  function autosize() {
+    els.input.style.height = 'auto';
+    els.input.style.height = Math.min(els.input.scrollHeight, 200) + 'px';
+  }
+
+  async function ask(text) {
+    text = text.trim();
+    if (!text || controller) return;
+    messages.push({ role: 'user', content: text });
+    addBubble('user', text);
+    els.input.value = '';
+    autosize();
+    save();
+
+    const body = addBubble('assistant', '');
+    body.innerHTML = '<span class="typing">생각 중</span>';
+    toBottom();
+    setBusy(true);
+    controller = new AbortController();
+    let answer = '';
+    let error = '';
+
+    try {
+      const res = await fetch('api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages, model: els.model.value, code: els.code.value }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `서버 오류 (${res.status})`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          if (!line) continue;
+          const ev = JSON.parse(line);
+          if (ev.error) error = ev.error;
+          if (ev.d) {
+            const stick = nearBottom();
+            answer += ev.d;
+            body.innerHTML = render(answer);
+            if (stick) toBottom();
+          }
+        }
+      }
+      if (!answer && !error) error = '모델이 빈 응답을 보냈습니다. 다시 시도하거나 다른 모델을 고르세요.';
+    } catch (err) {
+      if (err.name !== 'AbortError') error = err.message;
+    } finally {
+      controller = null;
+      setBusy(false);
+    }
+
+    if (answer) {
+      body.innerHTML = render(answer);
+      messages.push({ role: 'assistant', content: answer });
+    } else {
+      body.parentElement.remove();
+    }
+    if (error) addBubble('error', error);
+    save();
+    toBottom();
+    els.input.focus();
+  }
+
+  SUGGESTIONS.forEach((q) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip';
+    b.textContent = q;
+    b.onclick = () => ask(q);
+    els.chips.append(b);
+  });
+
+  els.form.addEventListener('submit', (e) => { e.preventDefault(); ask(els.input.value); });
+  els.input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); ask(els.input.value); }
+  });
+  els.input.addEventListener('input', autosize);
+  els.stop.onclick = () => controller?.abort();
+  els.reset.onclick = () => { messages = []; save(); redraw(); els.input.focus(); };
+  els.model.addEventListener('change', save);
+  els.code.addEventListener('change', save);
+
+  els.code.value = saved.code || '';
+  redraw();
+
+  fetch('api/chat').then((r) => r.json()).then((cfg) => {
+    cfg.models.forEach((m) => els.model.add(new Option(m.label, m.id)));
+    els.model.value = cfg.models.some((m) => m.id === saved.model) ? saved.model : cfg.defaultModel;
+    els.codeRow.hidden = !cfg.needsCode;
+    if (cfg.keyError) addBubble('error', cfg.keyError);
+  }).catch(() => addBubble('error', '서버 설정을 불러오지 못했습니다. Vercel에 배포된 주소에서 열었는지 확인하세요.'));
+})();
+</script>
+</body>
+</html>

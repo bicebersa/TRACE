@@ -22,6 +22,7 @@ SAP 예산판·시산표(TB)·전표와 감독원 양식 BS·PL·보험계약부
 | `modTrace.bas` | VBA 모듈 (CP949). 헤더 이름 불러오기 7종, 감독원 가로 양식 합치기, 대시보드 내보내기(data.js + 숨김 시트), 리포트 PDF |
 | `TRACE_대시보드.html` + `data.js` | HTML 대시보드. 상단 메뉴, 탭 5개, 엑셀(.xlsx·.xlsm)·data.js 업로드. 외부 리소스 없음 |
 | `TRACE_흐름.html` · `TRACE_IFRS17_연결.html` · `TRACE_사용설명서.html` | 처리 흐름, IFRS 17 연결 흐름, 사용설명서 (상단 메뉴로 연결) |
+| `index.html` + `api/chat.js` | TRACE 도우미 챗봇 (Vercel 배포용, OpenRouter 무료 Nemotron). 외부망 전용 |
 | `samples/샘플_감독원양식_2026-09.xlsx` | 예시 감독원 양식 (재무상태표·손익계산서·보험계약부채 변동표, 가로형) |
 | `docs/` | 사용설명서, 입력 양식 바꾸는 법, 프로젝트 정의, 작업 이력 |
 | `CLAUDE.md` | 이어서 작업할 때 읽는 프로젝트 안내 (환경 제약, 구조, 빌드·검증, 남은 일) |
@@ -46,6 +47,21 @@ SAP 예산판·시산표(TB)·전표와 감독원 양식 BS·PL·보험계약부
 5. IFRS17_사업비 시트에서 CSM·당기손익 영향과 근거 전표 확인
 6. 담당 부서 확인 결과를 코멘트 시트에 입력 → [대시보드 내보내기] → 저장
 7. `TRACE_대시보드.html`을 열면 같은 폴더의 `data.js`를 읽습니다. 다른 곳에서는 상단 [자료 불러오기]로 **엑셀 파일 자체**나 `data.js`를 올리면 됩니다
+
+## TRACE 도우미 챗봇 (Vercel)
+
+TRACE 사용법·입력 양식·원인 추정 규칙·IFRS 17 연결을 묻는 챗봇입니다. README와 `docs/`(사용설명서·입력 양식 변경·프로젝트 정의)를 근거로 답합니다. **외부망 서비스이므로 실제 업무 데이터는 입력하지 마세요.**
+
+1. Vercel 프로젝트 이름은 소문자로 정합니다 (예: `vercel --name trace`, 또는 처음 `vercel` 실행 때 이름에 `trace` 입력)
+2. Vercel 환경변수
+   - `OPENROUTER_API_KEY` (필수)
+   - `OPENROUTER_MODEL` (선택, 기본 `nvidia/nemotron-3-super-120b-a12b:free`)
+   - `CHAT_ACCESS_CODE` (선택, 설정하면 접속 코드를 입력해야 대화 가능)
+3. 배포하면 루트 주소(`/`)가 챗봇이고, 상단 링크로 대시보드·흐름·IFRS17 연결·사용설명서 페이지로 갑니다
+
+다른 주소의 페이지(예: claude.ai의 TRACE 대시보드 아티팩트)에서도 `/api/chat`을 부를 수 있도록 CORS를 열어 두었습니다. 접근을 제한하려면 `CHAT_ACCESS_CODE`를 설정하세요.
+
+화면에서 고를 수 있는 모델은 무료(`:free`) Nemotron 3종(Super · Ultra · 3.5 Lightning)뿐입니다. 서버가 이 목록 밖의 모델 요청을 거절하므로 키의 유료 크레딧이 쓰이지 않습니다.
 
 ## 입력 자료
 
