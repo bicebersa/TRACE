@@ -7,7 +7,7 @@ OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path
 VBA = r'''Attribute VB_Name = "modTrace"
 Option Explicit
 
-' TRACE 사업비 원인추적기 v0.4 - 매크로 모듈
+' TRACE 사업비 원인추적기 v0.5 - 매크로 모듈
 ' 설치: Alt+F11 > [파일] > [파일 가져오기] > modTrace.bas  →  Alt+F8 > SetupButtons 실행  →  .xlsm으로 저장
 ' 기능: 헤더 이름으로 불러오기(헤더설정 시트) / 보조수식 채우기 / 대시보드 데이터(data.js) 내보내기 (TOP 10 원인분석 포함) / 리포트 PDF
 
@@ -18,7 +18,7 @@ Private Const FIRST_ROW As Long = 5
 Public Sub FillAllHelpers()
     Application.ScreenUpdating = False
     Application.Calculation = xlCalculationManual
-    FillHelpers "전표_원본", 13, 29
+    FillHelpers "전표_원본", 13, 33
     FillHelpers "TB_원본", 9, 11
     FillHelpers "예산판_원본", 12, 18
     FillHelpers "BS_원본", 9, 11
@@ -57,7 +57,7 @@ Public Sub ExportDashboard()
     js = js & """kpi"": " & RowsJson("차트데이터", {CDG1}, {NKPI}, Array("label", "value", "compare", "rate", "basis")) & "," & vbLf
     js = js & """monthly"": " & RowsJson("차트데이터", {CDA1}, 12, Array("month", "cur", "prev", "budget")) & "," & vbLf
     js = js & """depts"": " & RowsJson("차트데이터", {CDB1}, {NDEPT}, Array("code", "name", "avail", "ytd", "forecast", "rate", "status")) & "," & vbLf
-    js = js & """status"": " & RowsJson("차트데이터", {CDC1}, 4, Array("status", "count")) & "," & vbLf
+    js = js & """status"": " & RowsJson("차트데이터", {CDC1}, 5, Array("status", "count")) & "," & vbLf
     js = js & """accounts"": " & RowsJson("차트데이터", {CDD1}, {NGL}, Array("gl", "name", "cur", "prevYear", "diff")) & "," & vbLf
     js = js & """bs"": " & RowsJson("차트데이터", {CDE1}, 12, Array("p", "period", "assets", "liabilities", "equity", "csm", "invested")) & "," & vbLf
     js = js & """pl"": " & RowsJson("차트데이터", {CDF1}, 12, Array("month", "niCur", "niPrev", "insCur", "invCur", "expCur", "insPrev")) & "," & vbLf
@@ -78,9 +78,10 @@ Public Sub ExportDashboard()
     Application.Calculate
     Application.ScreenUpdating = True
 
+    SaveJsonSheet js
     p = ThisWorkbook.Path & Application.PathSeparator & "data.js"
     WriteUtf8 p, js
-    If MsgBox("data.js를 만들었습니다." & vbLf & p & vbLf & vbLf & "TRACE_대시보드.html을 열까요?", vbYesNo + vbInformation, "TRACE") = vbYes Then
+    If MsgBox("data.js를 만들었습니다." & vbLf & p & vbLf & vbLf & "같은 결과를 숨김 시트 '대시보드데이터'에도 저장했습니다. 엑셀을 저장하면 이 파일 자체를 대시보드의 [자료 불러오기]로 올릴 수 있습니다." & vbLf & vbLf & "TRACE_대시보드.html을 열까요?", vbYesNo + vbInformation, "TRACE") = vbYes Then
         If Dir(ThisWorkbook.Path & Application.PathSeparator & "TRACE_대시보드.html") <> "" Then
             ThisWorkbook.FollowHyperlink ThisWorkbook.Path & Application.PathSeparator & "TRACE_대시보드.html"
         Else
@@ -93,12 +94,14 @@ Private Function Ifrs17Json() As String
     Dim ia As Worksheet
     Set ia = ThisWorkbook.Worksheets("IFRS17_사업비")
     Ifrs17Json = "{""summary"": " & JV(ia.Range("A{SUMR}").Value) & _
-        ", ""alloc"": " & RowsJson("IFRS17_사업비", {A01}, 4, Array("cat", "cur", "prev", "ytd", "share")) & _
+        ", ""alloc"": " & RowsJson("IFRS17_사업비", {A01}, 5, Array("cat", "cur", "prev", "ytd", "share")) & _
         ", ""pf"": " & RowsJson("IFRS17_사업비", {B01}, {NPF}, Array("pf", "name", "model", "cat", "actual", "expected", "diff", "target")) & _
-        ", ""totals"": {""csm"": " & JV(ia.Range("G{BT}").Value) & ", ""pl"": " & JV(ia.Range("G{BT1}").Value) & ", ""sep"": " & JV(ia.Range("G{BT2}").Value) & "}" & _
+        ", ""totals"": {""csm"": " & JV(ia.Range("G{BT}").Value) & ", ""csmVfa"": " & JV(ia.Range("G{BT1}").Value) & ", ""pl"": " & JV(ia.Range("G{BT2}").Value) & "}" & _
         ", ""recon"": " & RowsJson("IFRS17_사업비", {C01}, {NREC}, Array("pf", "model", "actuary", "trace", "diff", "status")) & _
         ", ""bridge"": " & RowsJson("IFRS17_사업비", {D01}, {NFAC}, Array("code", "name", "bel", "ra", "csm", "expense")) & _
         ", ""csmChange"": " & JV(ia.Range("E{D11}").Value) & ", ""csmExpense"": " & JV(ia.Range("E{D12}").Value) & _
+        ", ""bridgeVfa"": " & RowsJson("IFRS17_사업비", {DV01}, {NFAC}, Array("code", "name", "bel", "ra", "csm", "expense")) & _
+        ", ""csmChangeVfa"": " & JV(ia.Range("E{DV11}").Value) & ", ""csmExpenseVfa"": " & JV(ia.Range("E{DV12}").Value) & _
         ", ""drivers"": " & RowsJson("IFRS17_사업비", {E01}, 5, Array("rank", "dept", "account", "cur", "prev", "diff")) & _
         ", ""evidence"": " & RowsJson("IFRS17_사업비", {F01}, 10, Array("date", "doc", "cc", "gl", "vendor", "text", "amt", "nb")) & "}"
 End Function
@@ -136,7 +139,7 @@ Private Function TopItemJson(ByVal k As Long) As String
     wr = 5 + k
     s = "{""rank"": " & k & ", ""dept"": " & JV(w.Cells(wr, 2).Value) & ", ""account"": " & JV(w.Cells(wr, 3).Value) & _
         ", ""cur"": " & JV(w.Cells(wr, 4).Value) & ", ""mom"": " & JV(w.Cells(wr, 5).Value) & ", ""yoy"": " & JV(w.Cells(wr, 6).Value) & _
-        ", ""status"": " & JV(w.Cells(wr, 7).Value) & ", ""shortfall"": " & JV(w.Cells(wr, 8).Value) & ", ""month"": " & JV(w.Cells(wr, 9).Value) & _
+        ", ""status"": " & JV(w.Cells(wr, 7).Value) & ", ""qrate"": " & JV(w.Cells(wr, 8).Value) & ", ""annual"": " & JV(w.Cells(wr, 9).Value) & _
         ", ""signal"": " & JV(w.Cells(wr, 10).Value) & ", ""score"": " & JV(w.Cells(wr, 11).Value) & ", ""comment"": " & JV(w.Cells(wr, 13).Value)
     s = s & ", ""cause"": {""summary"": " & JV(ca.Range("A18").Value) & _
         ", ""curTotal"": " & JV(ca.Range("A16").Value) & ", ""cmpTotal"": " & JV(ca.Range("B16").Value) & ", ""diff"": " & JV(ca.Range("C16").Value) & ", ""candidates"": ["
@@ -181,6 +184,29 @@ Private Function JV(ByVal v As Variant) As String
     End Select
 End Function
 
+' 대시보드 결과(JSON)를 숨김 시트에 30,000자씩 나눠 저장 → 엑셀 파일만 올려도 HTML 대시보드가 읽음
+Private Sub SaveJsonSheet(ByVal js As String)
+    Dim ws As Worksheet, i As Long, n As Long
+    Const CHUNK As Long = 30000
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("대시보드데이터")
+    On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+        ws.Name = "대시보드데이터"
+    End If
+    ws.Cells.ClearContents
+    n = Int((Len(js) + CHUNK - 1) / CHUNK)
+    ws.Range("A1").Value = "TRACE_DATA"
+    ws.Range("B1").Value = n
+    ws.Range("C1").Value = Format(Now, "yyyy-mm-dd hh:nn")
+    ws.Columns(1).NumberFormat = "@"
+    For i = 1 To n
+        ws.Cells(i + 1, 1).Value = Mid$(js, (i - 1) * CHUNK + 1, CHUNK)
+    Next i
+    ws.Visible = xlSheetHidden
+End Sub
+
 Private Sub WriteUtf8(ByVal path As String, ByVal text As String)
     Dim st As Object
     Set st = CreateObject("ADODB.Stream")
@@ -200,7 +226,7 @@ Public Sub ImportTB()
     ImportSource "TB_원본", {TB0}, {TBN}, {TBK}, 9, 11
 End Sub
 Public Sub ImportJournal()
-    ImportSource "전표_원본", {JE0}, {JEN}, {JEK}, 13, 29
+    ImportSource "전표_원본", {JE0}, {JEN}, {JEK}, 13, 33
 End Sub
 Public Sub ImportBS()
     If InStr(CStr(ThisWorkbook.Worksheets("입력옵션").Range("C13").Value), "감독원") > 0 Then
@@ -522,7 +548,7 @@ FMX = D["FM"]
 IFL = D["IF"]
 for k_, v_ in {"{SUMR}": IFL["SUMR"], "{A01}": IFL["A0"] + 1, "{B01}": IFL["B0"] + 1, "{NPF}": IFL["B1"] - IFL["B0"], "{BT}": IFL["BT"], "{BT1}": IFL["BT"] + 1,
                "{BT2}": IFL["BT"] + 2, "{C01}": IFL["C0"] + 1, "{NREC}": IFL["C1"] - IFL["C0"], "{D01}": IFL["D0"] + 1, "{NFAC}": IFL["D1"] - IFL["D0"],
-               "{D11}": IFL["D1"] + 1, "{D12}": IFL["D1"] + 2, "{E01}": IFL["E0"] + 1, "{F01}": IFL["F0"] + 1}.items():
+               "{D11}": IFL["D1"] + 1, "{D12}": IFL["D1"] + 2, "{DV01}": IFL["DV0"] + 1, "{DV11}": IFL["DV1"] + 1, "{DV12}": IFL["DV1"] + 2, "{E01}": IFL["E0"] + 1, "{F01}": IFL["F0"] + 1}.items():
     VBA = VBA.replace(k_, str(v_))
 for tag, nm in (("BP", "예산판_원본"), ("TB", "TB_원본"), ("JE", "전표_원본"), ("BS", "BS_원본"), ("PL", "PL_원본"), ("EX", "예정사업비"), ("RF", "부채변동표")):
     VBA = VBA.replace("{" + tag + "0}", str(FMX[nm][0])).replace("{" + tag + "N}", str(FMX[nm][1])).replace("{" + tag + "K}", str(FMX[nm][2]))

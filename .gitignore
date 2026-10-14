@@ -2,6 +2,8 @@
 *.tmp
 __pycache__/
 src/tool_data.json
+legacy/src/*.json
+tools/_out/
 .DS_Store
 # 실제 업무 데이터는 올리지 마세요
 *.xlsm

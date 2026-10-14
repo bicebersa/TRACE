@@ -22,7 +22,7 @@ const MAX_CHARS = 8000;
 let contextPromise;
 function loadContext() {
   contextPromise ??= Promise.all(
-    ['README.md', 'docs/프로젝트정의.md', 'docs/입력양식_변경방법.md'].map(async (f) => {
+    ['README.md', 'docs/사용설명서.md', 'docs/입력양식_변경방법.md', 'docs/프로젝트정의.md'].map(async (f) => {
       try {
         return `### ${f}\n\n${await readFile(path.join(process.cwd(), f), 'utf8')}`;
       } catch {
@@ -34,7 +34,7 @@ function loadContext() {
 }
 
 function systemPrompt(context) {
-  return `너는 'TRACE 도우미'다. TRACE는 보험사 예산·사업비 담당자를 위한 사업비 변동 원인분석·예산 점검 도구(Excel 2016 + VBA + HTML)이며, IFRS 17(GMM) CSM·당기손익 영향까지 연결한다.
+  return `너는 'TRACE 도우미'다. TRACE는 보험사 예산·사업비 담당자를 위한 사업비 변동 원인분석·예산 점검 도구(Excel 2016 + VBA + HTML)이며, IFRS 17(GMM·VFA·PAA) CSM·당기손익 영향까지 연결한다.
 
 - 한국어로, 간결하고 정확하게 답한다. 필요하면 단계별 목록이나 표를 쓴다.
 - TRACE 사용법·시트·버튼·입력 양식 질문은 아래 문서를 근거로 답하고, 문서에 없는 내용은 추측하지 말고 문서에 없다고 말한다.

@@ -5,11 +5,11 @@ D = json.load(open(os.path.join(HERE, "tool_data.json")))
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data.js")
 E = D["E"]; BP = D["BP"]; KEYS = [tuple(k) for k in D["KEYS"]]
 Y, M = 2026, 9; P = Y * 12 + M; QS = Y * 12 + 7
-DEPTS = {"D100": "경영기획팀", "D200": "재무회계팀", "D300": "인사팀", "D400": "상품개발팀", "D500": "마케팅팀", "D600": "영업지원팀", "D700": "IT운영팀", "D800": "고객서비스팀", "D900": "영업채널팀"}
+DEPTS = {"D100": "경영기획팀", "D200": "재무회계팀", "D300": "인사팀", "D400": "상품개발팀", "D500": "마케팅팀", "D600": "영업지원팀", "D700": "IT운영팀", "D800": "고객서비스팀", "D900": "영업채널팀", "D950": "자산운용팀"}
 GLN = {"62101000": "여비교통비-국내", "62102000": "여비교통비-해외", "62201000": "통신비", "62301000": "소모품비", "62401000": "도서인쇄비", "62501000": "회의비",
        "62601000": "업무추진비", "62701000": "광고선전비", "62801000": "교육훈련비-사내", "62802000": "교육훈련비-외부위탁", "62901000": "지급수수료-컨설팅",
        "62902000": "지급수수료-기타", "63001000": "전산운영비-SW유지보수", "63002000": "전산운영비-클라우드", "63101000": "임차료", "63201000": "차량유지비", "63501000": "모집수수료", "63502000": "유지수수료"}
-CC2D = {"1101": "D100", "1201": "D200", "1301": "D300", "1401": "D400", "1501": "D500", "1502": "D500", "1601": "D600", "1602": "D600", "1701": "D700", "1801": "D800", "1901": "D900", "1902": "D900"}
+CC2D = {"1101": "D100", "1201": "D200", "1301": "D300", "1401": "D400", "1501": "D500", "1502": "D500", "1601": "D600", "1602": "D600", "1701": "D700", "1801": "D800", "1901": "D900", "1902": "D900", "1951": "D950"}
 KW = [("연간 일괄 계상", ["연간", "일시", "선급", "1년", "반기"], "연간·반기 계약을 한 번에 계상했을 가능성. 월할 안분 대상인지 확인"),
       ("캠페인·행사", ["캠페인", "행사", "이벤트", "프로모션", "박람회"], "일회성 캠페인·행사 비용일 가능성"),
       ("정정·취소", ["정정", "취소", "역분개", "오류", "환입"], "정정 전표 영향. 순액 기준으로 다시 확인"),
@@ -59,9 +59,14 @@ for d, gl in KEYS:
     if z >= 2: sig += "이상치 "
     if I == 0 and F > 0: sig += "신규지출 "
     c1 = min(max(0, N) / 50, 1) * 30; c2 = min(max(0, rate(F, G), rate(F, I)), 1) * 20; c3 = min(max(0, z) / 3, 1) * 25
-    c4 = 25 if W in ("부족 예상", "무예산") else 15 if W == "주의" else 0
+    qlim = sum((r[6] + r[7]) / 1e6 for r in BP if f"{r[1]}|{r[3]}" == k and r[5] == math.ceil(M / 3))
+    qact = tot(k, QS, P); qfc = qact + (mon[P - 2] + mon[P - 1] + mon[P]) / 3 * max(0, QS + 2 - P)
+    qrate = qfc / qlim if qlim else 0
+    qst = "무예산" if qlim == 0 and qact > 0 else "-" if qlim == 0 else "한도 초과" if qact > qlim else "초과 예상" if qrate > 1 else "주의" if qrate > 0.9 else "여유"
+    c4 = 25 if (W in ("부족 예상", "무예산") or qst in ("한도 초과", "초과 예상", "무예산")) else 15 if (W == "주의" or qst == "주의") else 0
     sc = round((c1 + c2 + c3 + c4) * (0.3 if F < 10 and N < 10 else 1), 1)
     VA[k] = dict(d=d, gl=gl, F=F, G=G, I=I, H=rate(F, G), J=rate(F, I), P=avail, Q=Q, U=U, V=V, W=W, X=X, Y=Ym, Z=sig.strip(), AA=sc, mon=mon,
+                 AJ=qlim, AK=qact, AM=qfc, AN=qrate, AO=qst,
                  row=7 + KEYS.index((d, gl)))
 rank = sorted(VA, key=lambda k: VA[k]["AA"] + VA[k]["row"] / 1e6, reverse=True)[:10]
 
@@ -135,7 +140,7 @@ def cause(k):
     va = VA[k]
     summ = (f"{DEPTS[va['d']]} · {GLN[va['gl']]} 전월 대비 {('+' if C16 > 0 else '') + t1(C16) if C16 != 0 else '0'} ({spct(D16)}). "
             + ("감소 또는 변동 없음 - 원인 후보는 증가 항목에만 만듭니다. " if C16 <= 0 else top + ". ")
-            + f"예산: {va['W']}" + (f" (연간 {t1(va['X'])} 부족 예상, {va['Y']} 소진 예상)" if va["X"] > 0 else "") + ".")
+            + f"분기 한도: {va['AO']}" + (f", 연간 {t1(va['X'])} 부족 예상 ({va['Y']} 소진)" if va["X"] > 0 else "") + ".")
     ev = sorted(cur, key=lambda e: abs(e["v"]) + e["row"] / 1e9, reverse=True)[:15]
     return dict(summary=summ, curTotal=A16, cmpTotal=B16, diff=C16,
                 candidates=[dict(pattern=c[1], strength=c[2], text=c[3]) for c in cands] or [dict(pattern="뚜렷한 패턴 없음", strength=None, text="근거 전표 목록을 직접 확인하세요")],
@@ -145,8 +150,8 @@ def cause(k):
 top10 = []
 for i, k in enumerate(rank, 1):
     v = VA[k]
-    top10.append(dict(rank=i, dept=DEPTS[v["d"]], account=GLN[v["gl"]], cur=v["F"], mom=v["H"], yoy=v["J"], status=v["W"], shortfall=v["X"],
-                      month=v["Y"] or None, signal=v["Z"] or None, score=v["AA"], comment=COMMENTS.get(k, "(미확인)"), cause=cause(k)))
+    top10.append(dict(rank=i, dept=DEPTS[v["d"]], account=GLN[v["gl"]], cur=v["F"], mom=v["H"], yoy=v["J"], status=v["AO"], qrate=v["AN"],
+                      annual=v["W"], signal=v["Z"] or None, score=v["AA"], comment=COMMENTS.get(k, "(미확인)"), cause=cause(k)))
 
 # ---------------- 차트데이터
 bs = {(r[0] * 12 + r[1], r[2]): r[6] / 1e6 for r in D["BS"]}
@@ -155,11 +160,11 @@ avail_q = lambda q: sum((r[6] + r[7]) / 1e6 for r in BP if r[5] == q)
 monthly = [dict(month=f"{m}월", cur=(sum(e["v"] for e in E if e["p"] == Y * 12 + m) if m <= M else 0),
                 prev=sum(e["v"] for e in E if e["p"] == (Y - 1) * 12 + m), budget=avail_q(math.ceil(m / 3)) / 3) for m in range(1, 13)]
 depts = []
-for d, nm in DEPTS.items():
-    a = sum(v["P"] for v in VA.values() if v["d"] == d); q = sum(v["Q"] for v in VA.values() if v["d"] == d); u = sum(v["U"] for v in VA.values() if v["d"] == d)
+for dd, nm in DEPTS.items():
+    a = sum(v["AJ"] for v in VA.values() if v["d"] == dd); q = sum(v["AK"] for v in VA.values() if v["d"] == dd); u = sum(v["AM"] for v in VA.values() if v["d"] == dd)
     r_ = u / a if a else 0
-    depts.append(dict(code=d, name=nm, avail=a, ytd=q, forecast=u, rate=r_, status="-" if a == 0 else "부족 예상" if r_ > 1 else "주의" if r_ > 0.9 else "여유"))
-status = [dict(status=s, count=sum(1 for v in VA.values() if v["W"] == s)) for s in ["여유", "주의", "부족 예상", "무예산"]]
+    depts.append(dict(code=dd, name=nm, avail=a, ytd=q, forecast=u, rate=r_, status="-" if a == 0 else "한도 초과" if q > a else "초과 예상" if r_ > 1 else "주의" if r_ > 0.9 else "여유"))
+status = [dict(status=s, count=sum(1 for v in VA.values() if v["AO"] == s)) for s in ["여유", "주의", "초과 예상", "한도 초과", "무예산"]]
 accounts = []
 for gl, nm in GLN.items():
     c = sum(e["v"] for e in E if e["gl"] == gl and e["p"] == P); py = sum(e["v"] for e in E if e["gl"] == gl and e["p"] == P - 12)
@@ -177,36 +182,43 @@ kpi = [dict(label="총자산", value=bs[(P, "A000")], compare=bs[(P - 12, "A000"
        dict(label="당기순이익 누계", value=pl[(P, "P600")][1], compare=pl[(P - 12, "P600")][1], rate=kv(pl[(P, "P600")][1], pl[(P - 12, "P600")][1]), basis="전년 누계"),
        dict(label="사업비 누계", value=ytd, compare=pytd, rate=kv(ytd, pytd), basis="전년 누계"),
        dict(label="사업비 당월", value=mc, compare=mp, rate=kv(mc, mp), basis="전월"),
-       dict(label="예산 부족 예상", value=status[2]["count"], compare=status[1]["count"], rate=None, basis="주의 건수")]
+       dict(label="분기 한도 초과(예상)", value=status[2]["count"] + status[3]["count"], compare=status[1]["count"], rate=None, basis="주의 건수")]
 # ---------------- IFRS17 (GMM) 사업비 영향
-CC_ALLOC = {"1101": (.9, 0, .1, 0), "1201": (.7, 0, .2, .1), "1301": (.8, .05, .15, 0), "1401": (.4, .5, .1, 0), "1501": (1, 0, 0, 0),
-            "1502": (.7, .3, 0, 0), "1601": (.2, .7, .1, 0), "1602": (.1, .8, .1, 0), "1701": (.4, .1, .4, .1), "1801": (.1, 0, .6, .3),
-            "1901": (0, .9, .05, .05), "1902": (0, .9, .05, .05)}
-GL_ALLOC = {"63501000": (0, 1, 0, 0), "63502000": (0, 0, .5, .5)}
+DIRECT = {"63501000": "신계약비", "63502000": "수금비", "62701000": "비귀속"}
+NATURE_OTHER = {"62601000", "62801000", "62802000"}
+DEPT_ALLOC = {"D100": (0, .10, 0, .90), "D200": (0, .20, .10, .70), "D300": (.05, .15, 0, .80), "D400": (.50, .10, 0, .40),
+              "D500": (.15, 0, 0, .85), "D600": (.75, .10, 0, .15), "D700": (.10, .40, .10, .40), "D800": (0, .60, .30, .10),
+              "D900": (.90, .05, .05, 0), "D950": (0, .30, 0, .70)}
+INV_DEPTS = ["D950"]; INV_RATE = {2025: 0.65, 2026: 0.70}
+def alloc_of(e):   # [비귀속, 신계약, 유지, 수금, 재산관리비]
+    if e["gl"] in DIRECT:
+        return [1.0 if DIRECT[e["gl"]] == c else 0.0 for c in ("비귀속", "신계약비", "유지비", "수금비")] + [0.0]
+    dd = CC2D[e["cc"]]
+    inv = INV_RATE.get(e["y"], 0) if (e["gl"] not in NATURE_OTHER and dd in INV_DEPTS) else 0.0
+    sn, mt, cl, na = DEPT_ALLOC.get(dd, (0, 0, 0, 1))
+    return [(1 - inv) * na, (1 - inv) * sn, (1 - inv) * mt, (1 - inv) * cl, inv]
 PFS = [("PF01", "보장성", "GMM"), ("PF02", "저축성", "GMM"), ("PF03", "단체(단기)", "PAA"), ("PF04", "변액", "VFA")]
 PF_DRV = {"PF01": (.55, .50, .50), "PF02": (.20, .30, .30), "PF03": (.10, .08, .08), "PF04": (.15, .12, .12)}
 for e in E:
-    rt = GL_ALLOC.get(e["gl"]) or CC_ALLOC.get(e["cc"]) or (1, 0, 0, 0)
-    e["al"] = [e["v"] * x for x in rt]
+    e["al"] = [e["v"] * x for x in alloc_of(e)]
 def catsum(j, p0, p1): return sum(e["al"][j] for e in E if p0 <= e["p"] <= p1)
-CATS = ["비귀속", "신계약비", "유지비", "수금비"]
+CATS = ["비귀속", "신계약비", "유지비", "수금비", "재산관리비"]
 alloc = [dict(cat=c, cur=catsum(j, P, P), prev=catsum(j, P - 1, P - 1), ytd=catsum(j, Y * 12 + 1, P)) for j, c in enumerate(CATS)]
 tot_cur = sum(a["cur"] for a in alloc)
 for a in alloc: a["share"] = a["cur"] / tot_cur if tot_cur else 0
 EXPD = {(r[0] * 12 + r[1], r[2]): [x / 1e6 for x in r[4:7]] for r in D["EXP"]}
 def target(model, cat):
-    if model == "VFA": return "구분계리(제외)"
-    if cat == "신계약비" and model == "GMM": return "CSM 조정"
-    if cat == "신계약비" and model == "PAA": return "당기손익"
+    if cat == "신계약비" and model in ("GMM", "VFA"): return f"CSM 조정 ({model})"
+    if cat == "신계약비": return "당기손익"
     return "당기손익(보험서비스결과)"
 pfrows = []
 for pf, pfn, mdl in PFS:
-    for j, cat in enumerate(CATS[1:]):
+    for j, cat in enumerate(CATS[1:4]):
         act = alloc[j + 1]["cur"] * PF_DRV[pf][j]; exp_ = EXPD[(P, pf)][j]
         pfrows.append(dict(pf=pf, name=pfn, model=mdl, cat=cat, actual=act, expected=exp_, diff=exp_ - act, target=target(mdl, cat)))
-tcsm = sum(r["diff"] for r in pfrows if r["target"] == "CSM 조정")
+tcsm = sum(r["diff"] for r in pfrows if r["target"] == "CSM 조정 (GMM)")
+tvfa = sum(r["diff"] for r in pfrows if r["target"] == "CSM 조정 (VFA)")
 tpl = sum(r["diff"] for r in pfrows if r["target"].startswith("당기손익"))
-tsep = sum(r["diff"] for r in pfrows if r["target"].startswith("구분계리"))
 ROLLP = [r for r in D["ROLL"] if r[0] * 12 + r[1] == P]
 recon = []
 for pf, pfn, mdl in PFS:
@@ -215,10 +227,13 @@ for pf, pfn, mdl in PFS:
     recon.append(dict(pf=pf, model=mdl, actuary=act, trace=tr, diff=act - tr, status="해당없음 (CSM 없음)" if mdl == "PAA" else ("일치" if abs(act - tr) < 0.5 else "차이 확인")))
 FACN = [("F00", "기초잔액"), ("F10", "신계약 효과"), ("F21", "가정변경-사업비"), ("F22", "가정변경-기타"), ("F31", "경험조정-신계약비"),
         ("F32", "경험조정-보험료 등"), ("F40", "보험금융비용(이자부리)"), ("F51", "CSM 상각"), ("F52", "RA 해제"), ("F60", "현금흐름 및 기타"), ("F99", "기말잔액")]
-bridge = [dict(code=c, name=n, bel=sum(r[7] for r in ROLLP if r[5] == c and r[4] == "GMM") / 1e6, ra=sum(r[8] for r in ROLLP if r[5] == c and r[4] == "GMM") / 1e6,
-               csm=sum(r[9] for r in ROLLP if r[5] == c and r[4] == "GMM") / 1e6, expense=c in ("F21", "F31")) for c, n in FACN]
-bmap = {b["code"]: b for b in bridge}
+def mkbridge(mdl):
+    return [dict(code=c, name=n, bel=sum(r[7] for r in ROLLP if r[5] == c and r[4] == mdl) / 1e6, ra=sum(r[8] for r in ROLLP if r[5] == c and r[4] == mdl) / 1e6,
+                 csm=sum(r[9] for r in ROLLP if r[5] == c and r[4] == mdl) / 1e6, expense=c in ("F21", "F31")) for c, n in FACN]
+bridge, bridgeV = mkbridge("GMM"), mkbridge("VFA")
+bmap = {b["code"]: b for b in bridge}; vmap = {b["code"]: b for b in bridgeV}
 csm_chg = bmap["F99"]["csm"] - bmap["F00"]["csm"]; csm_exp = bmap["F21"]["csm"] + bmap["F31"]["csm"]
+vcsm_chg = vmap["F99"]["csm"] - vmap["F00"]["csm"]; vcsm_exp = vmap["F21"]["csm"] + vmap["F31"]["csm"]
 drv = []
 for i, (d_, gl_) in enumerate(KEYS):
     k_ = f"{d_}|{gl_}"
@@ -236,9 +251,9 @@ summary17 = (f"GMM CSM 당월 변동 {sg(csm_chg, 0)} 중 사업비 관련 {sg(c
              f"신계약비 실제가 예정보다 {abs(nbt):,.1f}{' 많았고' if nbt < 0 else ' 적었고'}"
              + (f", 증가 기여 1위는 {drivers[0]['dept']} {drivers[0]['account']} ({sg(drivers[0]['diff'])})" if drivers else "")
              + (f", 대표 전표는 {evidence17[0]['vendor']} '{evidence17[0]['text']}' {evidence17[0]['nb']:,.1f}" if evidence17 else "")
-             + f". 당기손익 반영 경험차이 {sg(tpl)}. 변액(VFA)은 구분계리로 제외.")
-ifrs17 = dict(summary=summary17, alloc=alloc, pf=pfrows, totals=dict(csm=tcsm, pl=tpl, sep=tsep), recon=recon, bridge=bridge,
-              csmChange=csm_chg, csmExpense=csm_exp, drivers=[{k: v for k, v in d.items() if k != "sk"} for d in drivers], evidence=evidence17)
+             + f". 당기손익 반영 경험차이 {sg(tpl)}. VFA(변액) CSM 당월 변동 {sg(vcsm_chg, 0)} 중 사업비 관련 {sg(vcsm_exp)}.")
+ifrs17 = dict(summary=summary17, alloc=alloc, pf=pfrows, totals=dict(csm=tcsm, csmVfa=tvfa, pl=tpl), recon=recon, bridge=bridge, bridgeVfa=bridgeV,
+              csmChange=csm_chg, csmExpense=csm_exp, csmChangeVfa=vcsm_chg, csmExpenseVfa=vcsm_exp, drivers=[{k: v for k, v in d.items() if k != "sk"} for d in drivers], evidence=evidence17)
 
 data = dict(meta=dict(company="예시보험㈜", period=plab(P), unit="백만원", check="전체 정상 (참고 1건)", recon="전체 일치", generated="2026-10-14 (예시 데이터)"),
             kpi=kpi, monthly=monthly, depts=depts, status=status, accounts=accounts, bs=bsrows, pl=plrows, top10=top10, ifrs17=ifrs17)

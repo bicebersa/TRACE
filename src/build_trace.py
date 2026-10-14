@@ -1,6 +1,7 @@
-"""TRACE 엑셀(TRACE_v0.4.xlsx)을 예시 데이터와 함께 생성한다.
+"""TRACE 엑셀(TRACE_v0.5.xlsx)을 예시 데이터와 함께 생성한다.
 
 사용: python src/build_trace.py [출력폴더]   (기본: 저장소 루트)
+환경변수: JE_END(전표 수식 범위), SEL(검증용 원인분석 선택), EMBED_JSON(data.js 내장)
 필요: pip install openpyxl
 """
 import datetime as dt, json, os, random, sys, calendar
@@ -13,7 +14,7 @@ from openpyxl.utils import get_column_letter as CL
 
 OUTDIR = sys.argv[1] if len(sys.argv) > 1 else os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.makedirs(OUTDIR, exist_ok=True)
-XLSX = os.path.join(OUTDIR, "TRACE_v0.4.xlsx")
+XLSX = os.path.join(OUTDIR, "TRACE_v0.5.xlsx")
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 FONT = "맑은 고딕"
@@ -72,12 +73,12 @@ GLS = [("62101000", "여비교통비-국내", "B01", 0.85), ("62102000", "여비
        ("63501000", "모집수수료", "B13", 0.8), ("63502000", "유지수수료", "B13", 0.2)]
 GLNAME = {g[0]: g[1] for g in GLS}
 DEPTS = {"D100": "경영기획팀", "D200": "재무회계팀", "D300": "인사팀", "D400": "상품개발팀",
-         "D500": "마케팅팀", "D600": "영업지원팀", "D700": "IT운영팀", "D800": "고객서비스팀", "D900": "영업채널팀"}
+         "D500": "마케팅팀", "D600": "영업지원팀", "D700": "IT운영팀", "D800": "고객서비스팀", "D900": "영업채널팀", "D950": "자산운용팀"}
 CCS = [("1101", "경영기획", "D100", 1.0), ("1201", "재무회계", "D200", 1.0), ("1301", "인사", "D300", 1.0),
        ("1401", "상품개발", "D400", 1.0), ("1501", "마케팅전략", "D500", 0.6), ("1502", "디지털마케팅", "D500", 0.4),
        ("1601", "영업지원-본사", "D600", 0.55), ("1602", "영업지원-지역본부", "D600", 0.45),
        ("1701", "IT운영", "D700", 1.0), ("1801", "고객서비스", "D800", 1.0),
-       ("1901", "GA채널", "D900", 0.6), ("1902", "전속채널", "D900", 0.4)]
+       ("1901", "GA채널", "D900", 0.6), ("1902", "전속채널", "D900", 0.4), ("1951", "자산운용", "D950", 1.0)]
 BUDGET = {"D100": {"B01": 36000, "B02": 9600, "B03": 6000, "B05": 12000, "B06": 48000, "B09": 240000},
           "D200": {"B01": 18000, "B02": 7200, "B03": 7200, "B05": 6000, "B09": 420000},
           "D300": {"B01": 24000, "B02": 8400, "B03": 9600, "B05": 9600, "B06": 24000, "B08": 480000},
@@ -86,7 +87,8 @@ BUDGET = {"D100": {"B01": 36000, "B02": 9600, "B03": 6000, "B05": 12000, "B06": 
           "D600": {"B01": 96000, "B02": 26400, "B03": 14400, "B05": 18000, "B06": 42000, "B11": 216000, "B12": 96000},
           "D700": {"B01": 14400, "B02": 180000, "B03": 12000, "B05": 4800, "B10": 2400000},
           "D800": {"B01": 12000, "B02": 240000, "B03": 18000, "B04": 96000, "B05": 6000, "B09": 600000},
-          "D900": {"B13": 30000000}}  # 천원
+          "D900": {"B13": 30000000},
+          "D950": {"B01": 24000, "B02": 12000, "B09": 360000, "B10": 240000}}  # 천원
 SEASON = {"B07": [0.6, 0.8, 1.4, 1.2, 1, 0.8, 0.7, 0.8, 1.4, 1.3, 1.0, 1.0]}
 POOL = {"62101000": ["L여행사", "M항공", "(법인카드)"], "62102000": ["M항공", "N호텔"], "62201000": ["O텔레콤", "P통신"],
         "62301000": ["Q오피스", "R문구"], "62401000": ["G인쇄", "S출판"], "62501000": ["(법인카드)", "T케이터링"],
@@ -137,7 +139,7 @@ def spread(y, m, d, gl, total, pool=None):
 CUSTOM = {("D500", "62701000"), ("D700", "63002000"), ("D600", "63201000"), ("D300", "62802000"), ("D800", "62902000"),
           ("D900", "63501000"), ("D900", "63502000")}
 for (d, gl), bm in bud_gl.items():
-    if (d, gl) in CUSTOM: continue
+    if (d, gl) in CUSTOM or d == "D950": continue
     f = rng.uniform(0.80, 0.92); g = rng.uniform(0.78, 0.92)
     for y, m in MONTHS:
         spread(y, m, d, gl, bm[m - 1] * (g if y == 2025 else f) * rng.uniform(0.88, 1.12))
@@ -194,6 +196,11 @@ for gl_ in ("63501000", "63502000"):
         spread(y, m, "D900", gl_, bm[m - 1] * (0.86 if y == 2025 else 0.9) * rng.uniform(0.985, 1.015))
 # S8 영업채널팀 모집수수료: 9월 신상품 GA 판매시책비 (신계약비 일회성 증가 → GMM CSM 경험조정)
 add(2026, 9, "D900", "63501000", 650 * MIL, "AA보험대리점", "9월 신상품 GA 판매시책비 (추가 수수료)", day=26, cc="1901")
+rng = random.Random(37)   # 자산운용팀: 별도 난수
+for (d_, gl_), bm in bud_gl.items():
+    if d_ != "D950": continue
+    for y, m in MONTHS:
+        spread(y, m, "D950", gl_, bm[m - 1] * (0.85 if y == 2025 else 0.88) * rng.uniform(0.95, 1.05))
 rng = _save
 
 E.sort(key=lambda e: (e["date"], e["gl"], e["cc"]))
@@ -254,12 +261,12 @@ wb = Workbook()
 
 # =================================================================== 안내
 ws = wb.active; ws.title = "안내"
-title(ws, "TRACE 사업비 원인추적기 v0.4 (프로토타입)", "Excel 2016 호환 · 계산은 수식, 자동화는 VBA(modTrace.bas) · 예시 데이터는 가상 수치 (원본 단위: 원, 보고 단위: 백만원)")
+title(ws, "TRACE 사업비 원인추적기 v0.5 (프로토타입)", "Excel 2016 호환 · 계산은 수식, 자동화는 VBA(modTrace.bas) · 예시 데이터는 가상 수치 (원본 단위: 원, 보고 단위: 백만원)")
 r = 4
 sec(ws, r, "이름의 뜻"); r += 1
 header(ws, r, ["글자", "뜻", "도구에서 하는 일 (시트)"], h=20); r += 1
 for a, b, c in [("T", "Trend 추이", "전월·전분기·전년동월 대비 변동 (변동분석 · 월별집계 · 계정변동)"),
-                ("R", "Risk 예산 위험", "예상 연간 실적으로 여유/주의/부족 예상 판정 (변동분석 P~Y열)"),
+                ("R", "Risk 예산 위험", "부서 × 계정 × 분기 한도 점검(변동분석 AJ~AO열)과 연간 전망(P~Y열)"),
                 ("A", "Anomaly 이상치", "평소 변동폭을 벗어난 항목을 점수로 골라냄 (주의대상)"),
                 ("C", "Cause 원인", "증가분을 거래처·전표로 쪼개 원인 후보와 근거 전표 제시 (원인분석 · 키워드사전)"),
                 ("E", "Expense 사업비", "분석 대상: 사업비 계정 (계정매핑에서 사업비 여부 Y)")]:
@@ -270,11 +277,11 @@ header(ws, r, ["단계", "하는 일", "시트"], h=20); r += 1
 for a, b, c in [("① 자료 넣기", "SAP 예산판·TB·전표·BS·PL을 원본 시트 A열부터 붙여넣기", "예산판_원본 · TB_원본 · 전표_원본 · BS_원본 · PL_원본"),
                 ("② 불러오기·대사", "매핑 적용, 전표 = TB = 예산판 실적 대사, 데이터 점검", "자가진단 · 계정변동"),
                 ("③ 변동 분석", "전월·전분기·전년동월 대비 증감 (부서 × 계정)", "변동분석 F~O열 · 월별집계 · 계정변동"),
-                ("④ 예산 점검", "배정+조정 대비 예상 연간 실적 → 여유/주의/부족 예상", "변동분석 P~Y열"),
+                ("④ 예산 점검", "분기 한도(배정+조정) 대비 분기 실적·분기말 예상 → 여유/주의/초과 예상/한도 초과, 연간 전망은 참고", "변동분석 AJ~AO열 · P~Y열"),
                 ("⑤ 주의 대상", "증가액·증가율·이상치·예산 점수 합산 → TOP 10", "주의대상 · 변동분석 AA열 이후"),
                 ("⑥ 원인 추정", "선택 항목을 거래처·전표로 분해, 8가지 패턴 판정, 근거 전표", "원인분석 · 키워드사전"),
                 ("⑦ 보고·확인", "보고서·대시보드, 확인된 원인을 코멘트로 누적", "리포트 · 대시보드 · 차트데이터 · 코멘트 · TRACE_대시보드.html"),
-                ("⑧ IFRS 17 연결", "사업비 귀속 배분 → 포트폴리오 → 예정 대비 경험차이 → CSM(GMM)·당기손익, 계리 변동표와 대사", "IFRS17_사업비 · 배분기준 · 예정사업비 · 부채변동표")]:
+                ("⑧ IFRS 17 연결", "계정대체(직접대체 → 재산관리비 → 부서별 비율) → 상품·포트폴리오 → 예정 대비 경험차이 → CSM(GMM)·당기손익, 계리 변동표와 대사", "IFRS17_사업비 · 계정대체기준 · 계정매핑 · 예정사업비 · 부채변동표")]:
     put(ws, r, 1, a, bold=True); put(ws, r, 2, b); put(ws, r, 3, c, GRAY); r += 1
 r += 1
 sec(ws, r, "매월 사용 순서"); r += 1
@@ -298,7 +305,7 @@ for ln in ["1. 열 이름·순서가 다름 → 헤더설정 시트의 '찾을 �
            "2. 같은 열을 부르는 이름이 여러 개 → '대체 이름'에 쉼표로 추가 (예: 금액, DMBTR, 현지통화금액)",
            "3. 전표가 차대구분(S/H) + 양수 금액 형식 → 입력옵션 시트에서 '전표 금액 방식'을 '차대구분+양수금액'으로",
            "4. BS·PL 항목코드가 회사 코드 → 입력옵션 시트의 항목 매핑에 실제 항목코드(또는 항목명) 입력",
-           "5. 계정·부서 체계가 다름 → 계정매핑(사업비 여부 Y/제외)·부서매핑(코스트센터 → 부서) 수정",
+           "5. 계정·부서 체계가 다름 → 계정매핑(사업비 여부, IFRS17 대체구분·직접대체 계정·공통비 성격)·부서매핑(코스트센터 → 부서)·계정대체기준(재산관리비 비율, 부서별 비율) 수정",
            "6. 선택 열이 없음 → 비워둬도 됩니다. 빠지는 기능은 헤더설정 '없을 때' 칸에 적혀 있습니다",
            "7. BS·PL을 감독원 양식(항목이 행, 금액이 열)으로 받음 → 입력옵션 'BS·PL 양식 형태'를 '감독원 (가로)'로, 당기·전기·누계 열 이름 지정 (기준월 한 달씩 합쳐짐)",
            "8. 감독원 양식의 항목코드·변동요인코드 → 입력옵션의 항목 매핑·변동요인 매핑에 실제 코드 입력 (예시 감독원 양식 코드가 기본값)",
@@ -320,8 +327,8 @@ sec(ws, r, "한계와 전제"); r += 1
 for ln in ["원인분석은 한 번에 한 항목씩 계산합니다. TOP 10 전체 원인을 리포트에 자동으로 채우는 기능은 VBA로 추가 예정입니다.",
            "변동분석의 부서·계정 목록은 고정입니다. 새 조합이 생기면 자가진단이 알려주며, 행을 직접 추가해야 합니다 (VBA 버전에서 자동).",
            "원인 후보는 규칙 기반 가설입니다. 반드시 근거 전표와 담당 부서 확인으로 확정하세요.",
-           "IFRS 17 연결은 배분율로 전표를 포트폴리오에 나눈 추정입니다. 계리 변동표(경험조정-신계약비)와 대사해 확인하세요. 측정모형별 처리는 회사 회계정책을 따릅니다.",
-           "포트폴리오: GMM(보장성·저축성) 중심, PAA(단체)는 손익 영향만, VFA(변액)는 구분계리라 분석에서 제외하고 참고로만 표시합니다."]:
+           "IFRS 17 연결은 계정대체 규칙과 포트폴리오 비율로 전표를 나눈 추정입니다. 계리 변동표(경험조정-신계약비)와 대사해 확인하세요. 측정모형별 처리는 회사 회계정책을 따릅니다.",
+           "포트폴리오: GMM(보장성·저축성)과 VFA(변액)는 신계약비 차이가 CSM을 조정하고 유지·수금비 차이는 당기손익, PAA(단체)는 손익 영향만 봅니다. 변액은 특별계정 구분계리 대상이지만 손익에 영향을 주므로 분석에 포함합니다."]:
     ws.cell(row=r, column=1, value=ln).font = F(); r += 1
 widths(ws, [18, 60, 62])
 
@@ -359,13 +366,18 @@ widths(st, [2, 30, 14, 62, 3, 9, 12])
 # =================================================================== 매핑
 gm = wb.create_sheet("계정매핑")
 title(gm, "계정 매핑", "사업비 여부가 Y인 계정만 분석 · 코드 칸은 텍스트")
-header(gm, 4, ["G/L 계정", "계정명", "사업비 항목", "사업비 여부"])
-rows = [(g[0], g[1], ITEMS[g[2]], "Y") for g in GLS] + [("61101000", "급여", "인건비", "제외"), ("61201000", "복리후생비", "인건비", "제외")]
+header(gm, 4, ["G/L 계정", "계정명", "사업비 항목", "사업비 여부", "IFRS17\n대체구분", "직접대체\nIFRS17 계정", "공통비\n성격"], h=32)
+DIRECT = {"63501000": "신계약비", "63502000": "수금비", "62701000": "비귀속"}
+NATURE_OTHER = {"62601000", "62801000", "62802000"}
+rows = [(g[0], g[1], ITEMS[g[2]], "Y", "직접" if g[0] in DIRECT else "공통비", DIRECT.get(g[0], ""), "" if g[0] in DIRECT else ("기타" if g[0] in NATURE_OTHER else "유지비")) for g in GLS] \
+       + [("61101000", "급여", "인건비", "제외", "", "", ""), ("61201000", "복리후생비", "인건비", "제외", "", "", "")]
 for i, rw in enumerate(rows):
     for j, v in enumerate(rw):
-        c = put(gm, 5 + i, j + 1, v, BLUE, align="center" if j in (0, 3) else None)
+        c = put(gm, 5 + i, j + 1, v or None, BLUE, align="center" if j in (0, 3, 4, 5, 6) else None)
         if j == 0: c.number_format = "@"
-gm.freeze_panes = "A5"; widths(gm, [12, 24, 14, 11])
+for rng_, lst in (("E5:E504", '"직접,공통비"'), ("F5:F504", '"신계약비,유지비,수금비,비귀속"'), ("G5:G504", '"유지비,기타"')):
+    dv = DataValidation(type="list", formula1=lst, allow_blank=True); gm.add_data_validation(dv); dv.add(rng_)
+gm.freeze_panes = "A5"; widths(gm, [12, 24, 14, 11, 11, 13, 10])
 
 dm = wb.create_sheet("부서매핑")
 title(dm, "부서 매핑", "코스트센터 → 부서 · 코드 칸은 텍스트")
@@ -381,7 +393,7 @@ je = wb.create_sheet("전표_원본")
 title(je, "전표 원본 (사업비 계정 전표 라인)", "A~K: 붙여넣기 · M~X: 보조수식 (회색, 수정 금지) · 최근 24개월 권장")
 header(je, 4, JE_HDR)
 header(je, 4, ["기간번호", "부서코드", "키", "금액\n(보고단위)", "선택구분", "선택거래처", "첫등장행", "당기\n근거점수", "비교\n근거점수", "목록포함", "사업비여부", "G/L텍스트",
-               "비귀속", "신계약비", "유지비", "수금비", "신계약\n근거점수"], start=13, fill=GRAYH)
+               "비귀속", "신계약비", "유지비", "수금비", "신계약\n근거점수", "재산관리비", "대체구분", "직접대체\n계정", "재산관리비\n비율"], start=13, fill=GRAYH)
 for k, e in enumerate(E):
     r = 5 + k
     vals = [e["y"], e["m"], e["doc"], e["date"], e["typ"], int(e["gl"]), int(e["cc"]), e["amt"], e["text"], vcode[e["vname"]], e["vname"]]
@@ -403,16 +415,23 @@ for r in range(5, JE_FILL + 1):
           f'=IF($A{r}="","",IF(COUNTIF({VR("E")},O{r})>0,"Y","N"))',
           f'=IF($A{r}="","",IFERROR(INDEX(계정매핑!$D$5:$D$504,MATCH($F{r}&"",계정매핑!$A$5:$A$504,0)),"미매핑"))',
           f'=IF($A{r}="","",$F{r}&"")']
-    for k_, col_ in enumerate(("C", "D", "E", "F")):
-        fm.append(f'=IF($A{r}="",0,$P{r}*IFERROR(INDEX(배분기준!${col_}$60:${col_}$79,MATCH($F{r}&"",배분기준!$A$60:$A$79,0)),'
-                  f'IFERROR(INDEX(배분기준!${col_}$6:${col_}$55,MATCH($G{r}&"",배분기준!$A$6:$A$55,0)),{1 if k_ == 0 else 0})))')
+    # Y 비귀속 · Z 신계약비 · AA 유지비 · AB 수금비 = 직접대체면 지정 계정에 전액, 공통비면 (1 − 재산관리비율) × 부서별 비율
+    for cat_, col_ in (("비귀속", "F"), ("신계약비", "C"), ("유지비", "D"), ("수금비", "E")):
+        fm.append(f'=IF($A{r}="",0,IF(AE{r}="직접",IF(AF{r}="{cat_}",$P{r},0),$P{r}*(1-AG{r})*'
+                  f'IFERROR(INDEX(계정대체기준!${col_}$20:${col_}$49,MATCH($N{r},계정대체기준!$A$20:$A$49,0)),{1 if cat_ == "비귀속" else 0})))')
     fm.append(f'=IF(AND($A{r}<>"",M{r}={S["P"]},Z{r}>0),Z{r}+ROW()/1000000000,"")')
+    fm.append(f'=IF($A{r}="",0,$P{r}*AG{r})')
+    fm.append(f'=IF($A{r}="","",IFERROR(INDEX(계정매핑!$E$5:$E$504,MATCH($F{r}&"",계정매핑!$A$5:$A$504,0))&"","공통비"))')
+    fm.append(f'=IF($A{r}="","",IF(AE{r}="직접",IFERROR(INDEX(계정매핑!$F$5:$F$504,MATCH($F{r}&"",계정매핑!$A$5:$A$504,0))&"","비귀속"),""))')
+    fm.append(f'=IF($A{r}="",0,IF(AND(AE{r}<>"직접",IFERROR(INDEX(계정매핑!$G$5:$G$504,MATCH($F{r}&"",계정매핑!$A$5:$A$504,0))&"","")="유지비",'
+              f'COUNTIF(계정대체기준!$A$6:$A$15,$N{r})>0),IFERROR(INDEX(계정대체기준!$E$6:$E$15,MATCH(VALUE($A{r}&""),계정대체기준!$D$6:$D$15,0)),0),0))')
     for j, f_ in enumerate(fm):
         c = je.cell(row=r, column=13 + j, value=f_)
-        c.font = F(GREEN if j in (1, 3, 4, 9, 10, 12, 13, 14, 15) else BLACK)
-        if j in (3, 12, 13, 14, 15): c.number_format = NUM
-je.freeze_panes = "A5"; je.auto_filter.ref = "A4:AC4"
-widths(je, [8, 5, 12, 11, 7, 10, 9, 13, 40, 9, 13, 2, 8, 8, 14, 10, 8, 12, 8, 9, 9, 8, 8, 10, 9, 9, 9, 9, 9])
+        c.font = F(GREEN if j in (1, 3, 4, 9, 10, 12, 13, 14, 15, 17, 18, 19, 20) else BLACK)
+        if j in (3, 12, 13, 14, 15, 17): c.number_format = NUM
+        if j == 20: c.number_format = PCT
+je.freeze_panes = "A5"; je.auto_filter.ref = "A4:AG4"
+widths(je, [8, 5, 12, 11, 7, 10, 9, 13, 40, 9, 13, 2, 8, 8, 14, 10, 8, 12, 8, 9, 9, 8, 8, 10, 9, 9, 9, 9, 9, 9, 8, 9, 9])
 
 # =================================================================== TB_원본
 tb = wb.create_sheet("TB_원본")
@@ -461,6 +480,8 @@ cols = ["부서코드", "부서명", "G/L 계정", "계정명", "키",
         "빠른 신호 (당월)", "주의\n점수"]
 header(va, 6, cols, h=44)
 header(va, 6, ["정렬키", "단건비중", "SA순증", "음수건수", "증가액\n(30)", "증가율\n(20)", "이상치\n(25)", "예산\n(25)"], start=28, fill=GRAYH, h=44)
+header(va, 6, ["분기 한도\n(배정+조정)", "분기 실적", "분기 잔여", "분기말\n예상", "분기\n소진율", "분기 판정"], start=36, h=44)
+va.cell(row=5, column=36, value="④-2 분기 한도 점검 (예산 통제 단위: 부서 × 계정 × 분기)").font = F(bold=True)
 for c, t_ in [(6, "③ 변동"), (16, "④ 예산 점검"), (26, "⑤ 주의")]:
     va.cell(row=5, column=c, value=t_).font = F(bold=True)
 VA_PRE = 7 + len(KEYS) + 40
@@ -508,12 +529,20 @@ for idx in range(VA_PRE - 7):
         32: (f'={blank},MIN(MAX(0,N{r})/({S["amt"]}*5),1)*30)', GREEN, "0.0"),
         33: (f'={blank},MIN(MAX(0,H{r},J{r}),1)*20)', BLACK, "0.0"),
         34: (f'={blank},MIN(MAX(0,O{r})/3,1)*25)', BLACK, "0.0"),
-        35: (f'={blank},IF(OR(W{r}="부족 예상",W{r}="무예산"),25,IF(W{r}="주의",15,0)))', BLACK, "0.0"),
+        35: (f'={blank},IF(OR(W{r}="부족 예상",W{r}="무예산",AO{r}="한도 초과",AO{r}="초과 예상",AO{r}="무예산"),25,IF(OR(W{r}="주의",AO{r}="주의"),15,0)))', BLACK, "0.0"),
+        36: (f'={blank},SUMIFS({BR("O")},{BR("L")},$E{r},{BR("M")},{S["yr"]},{BR("N")},{S["Q"]}))', GREEN, NUM),
+        37: (f'={blank},K{r})', BLACK, NUM),
+        38: (f'={blank},AJ{r}-AK{r})', BLACK, NUM),
+        39: (f'={blank},AK{r}+AVERAGE(월별집계!X{r}:Z{r})*MAX(0,{S["qs"]}+2-{S["P"]}))', GREEN, NUM),
+        40: (f'={blank},IF(AJ{r}=0,0,AM{r}/AJ{r}))', BLACK, PCT),
+        41: (f'={blank},IF(AND(AJ{r}=0,AK{r}>0),"무예산",IF(AJ{r}=0,"-",IF(AK{r}>AJ{r},"한도 초과",IF(AN{r}>{S["short"]},"초과 예상",IF(AN{r}>{S["warn"]},"주의","여유"))))))', GREEN, None),
     }
     for c, (f_, col, fmt) in fm.items():
-        put(va, r, c, f_, col, fmt, align="center" if c in (5, 23, 25) else None)
-va.freeze_panes = "F7"; va.auto_filter.ref = f"A6:AI{VA_PRE-1}"
-widths(va, [8, 12, 10, 18, 8] + [9] * 10 + [11, 10, 10, 10, 10, 10, 8, 10, 9, 9, 20, 7] + [8] * 8)
+        put(va, r, c, f_, col, fmt, align="center" if c in (5, 23, 25, 41) else None)
+va.freeze_panes = "F7"; va.auto_filter.ref = f"A6:AO{VA_PRE-1}"
+widths(va, [8, 12, 10, 18, 8] + [9] * 10 + [11, 10, 10, 10, 10, 10, 8, 10, 9, 9, 20, 7] + [8] * 8 + [11, 10, 10, 10, 8, 10])
+for val, fill in (('"한도 초과"', "F8CBAD"), ('"초과 예상"', "FCE4D6"), ('"주의"', "FFE699"), ('"무예산"', "D9C3E9")):
+    va.conditional_formatting.add(f"AO7:AO{VA_END}", CellIsRule(operator="equal", formula=[val], fill=PatternFill("solid", fgColor=fill)))
 va.column_dimensions["E"].hidden = True
 for rng_, rules in [(f"W7:W{VA_END}", [('"부족 예상"', "F8CBAD", "9C0006"), ('"주의"', "FFE699", None), ('"무예산"', "D9C3E9", None)])]:
     for val, fill, fc in rules:
@@ -648,18 +677,18 @@ ca["E7"] = f'="당기 "&{plabel("$C$10")}&IF($C$10<>$C$11," ~ "&{plabel("$C$11")
 ca["E7"].font = F(GREEN)
 ca["E9"] = '=E6&" ("&C6&" 대비)"'; ca["E9"].font = F(GREEN, size=9)
 
-header(ca, 15, ["당기 합계", "비교 합계", "증감", "증감률", "예산 판정", "부족 예상액", "소진 예상월"], h=20)
+header(ca, 15, ["당기 합계", "비교 합계", "증감", "증감률", "분기 판정", "연간 부족 예상액", "연간 소진 예상월"], h=20)
 put(ca, 16, 1, f'=SUMIFS({JR("P")},{JR("Q")},"당기")', GREEN, NUM, bold=True)
 put(ca, 16, 2, f'=SUMIFS({JR("P")},{JR("Q")},"비교")', GREEN, NUM, bold=True)
 put(ca, 16, 3, "=A16-B16", fmt='+#,##0.0;-#,##0.0;0', bold=True)
 put(ca, 16, 4, "=IF(B16<=0,IF(A16>0,1,0),A16/B16-1)", fmt=RATE, bold=True)
-put(ca, 16, 5, f'=IFERROR(INDEX({VR("W")},MATCH($C$9,{VR("E")},0)),"-")', GREEN, bold=True, align="center")
+put(ca, 16, 5, f'=IFERROR(INDEX({VR("AO")},MATCH($C$9,{VR("E")},0)),"-")', GREEN, bold=True, align="center")
 put(ca, 16, 6, f'=IFERROR(INDEX({VR("X")},MATCH($C$9,{VR("E")},0)),0)', GREEN, NUM, bold=True)
 put(ca, 16, 7, f'=IFERROR(INDEX({VR("Y")},MATCH($C$9,{VR("E")},0)),"")', GREEN, bold=True, align="center")
 ca.merge_cells("A18:I18")
 ca["A18"] = ('=IF($C$9="","선택된 항목이 없습니다.",$E$6&" "&$C$6&" 대비 "&TEXT($C$16,"+#,##0.0;-#,##0.0;0")&" ("&TEXT($D$16,"+0%;-0%;0%")&"). "'
              '&IF($C$16<=0,"감소 또는 변동 없음 - 원인 후보는 증가 항목에만 만듭니다. ",$D$21&". ")'
-             '&"예산: "&$E$16&IF(N($F$16)>0," (연간 "&TEXT($F$16,"#,##0.0")&" 부족 예상, "&$G$16&" 소진 예상)","")&".")')
+             '&"분기 한도: "&$E$16&IF(N($F$16)>0,", 연간 "&TEXT($F$16,"#,##0.0")&" 부족 예상 ("&$G$16&" 소진)","")&".")')
 ca["A18"].font = F(bold=True, size=11); ca["A18"].alignment = Alignment(wrap_text=True, vertical="top"); ca["A18"].fill = BOXF
 ca.row_dimensions[18].height = 48
 
@@ -797,19 +826,19 @@ ca.freeze_panes = "A15"
 # =================================================================== 주의대상
 wt = wb.create_sheet("주의대상")
 title(wt, "주의 대상 TOP 10", "점수 = 증가액(30) + 증가율(20) + 이상치(25) + 예산(25), 작은 금액은 30%로 낮춤 · 원인은 원인분석 시트 C5에 순위 입력")
-wt["A3"] = f'="기준: "&{plabel(S["P"])}&" · 단위: "&{S["ur"]}&" · 예산 부족 예상 "&COUNTIF({VR("W")},"부족 예상")&"건 · 주의 "&COUNTIF({VR("W")},"주의")&"건 · 무예산 "&COUNTIF({VR("W")},"무예산")&"건"'
+wt["A3"] = f'="기준: "&{plabel(S["P"])}&" · 단위: "&{S["ur"]}&" · 분기 한도 초과 "&COUNTIF({VR("AO")},"한도 초과")&"건 · 초과 예상 "&COUNTIF({VR("AO")},"초과 예상")&"건 · 주의 "&COUNTIF({VR("AO")},"주의")&"건 · 무예산 "&COUNTIF({VR("AO")},"무예산")&"건"'
 wt["A3"].font = F(GREEN, size=9)
-header(wt, 5, ["순위", "부서", "계정", "당월", "전월\n대비", "전년동월\n대비", "예산판정", "부족\n예상액", "소진\n예상월", "빠른 신호", "점수", "키", "확인된 원인 (코멘트)"], h=32)
+header(wt, 5, ["순위", "부서", "계정", "당월", "전월\n대비", "전년동월\n대비", "분기 판정", "분기\n소진율", "연간 판정", "빠른 신호", "점수", "키", "확인된 원인 (코멘트)"], h=32)
 header(wt, 5, ["행"], start=14, fill=GRAYH, h=32)
 for k in range(1, 11):
     r = 5 + k
     put(wt, r, 1, k, align="center", bold=True)
     put(wt, r, 14, f'=IFERROR(MATCH(LARGE({VR("AB")},A{r}),{VR("AB")},0),"")', GRAY)
-    for c, src, fmt in [(2, "B", None), (3, "D", None), (4, "F", NUM), (5, "H", RATE), (6, "J", RATE), (7, "W", None), (8, "X", NUM), (9, "Y", None), (10, "Z", None), (11, "AA", "0.0"), (12, "E", None)]:
+    for c, src, fmt in [(2, "B", None), (3, "D", None), (4, "F", NUM), (5, "H", RATE), (6, "J", RATE), (7, "AO", None), (8, "AN", PCT), (9, "W", None), (10, "Z", None), (11, "AA", "0.0"), (12, "E", None)]:
         put(wt, r, c, f'=IF($N{r}="","",INDEX({VR(src)},$N{r}))', GREEN, fmt, align="center" if c in (7, 9, 11) else None)
     put(wt, r, 13, f'=IF($L{r}="","",IFERROR(INDEX(코멘트!$F$5:$F$2004,MATCH({S["yr"]}&"|"&{S["mon"]}&"|"&$L{r},코멘트!$I$5:$I$2004,0)),"(미확인)"))', GREEN, wrap=True)
     wt.row_dimensions[r].height = 30
-for val, fill in (('"부족 예상"', "F8CBAD"), ('"주의"', "FFE699"), ('"무예산"', "D9C3E9")):
+for val, fill in (('"한도 초과"', "F8CBAD"), ('"초과 예상"', "FCE4D6"), ('"부족 예상"', "F8CBAD"), ('"주의"', "FFE699"), ('"무예산"', "D9C3E9")):
     wt.conditional_formatting.add("G6:G15", CellIsRule(operator="equal", formula=[val], fill=PatternFill("solid", fgColor=fill)))
 widths(wt, [6, 12, 18, 9, 8, 9, 10, 9, 8, 22, 6, 4, 50, 5])
 wt.column_dimensions["L"].hidden = True
@@ -821,8 +850,8 @@ rp["A1"] = f'={S["co"]}&" TRACE 사업비 변동 점검 ("&{plabel(S["P"])}&")"'
 rp["A2"] = f'="단위: "&{S["ur"]}&" · 전표·TB·예산판 대사: "&계정변동!$P${AT}&" · 자가진단: "&자가진단!$B$4'; rp["A2"].font = F(GRAY, size=9)
 kp = [("사업비 당월", "=월별집계!Z6", NUM), ("전월 대비", "=IF(월별집계!Y6<=0,0,월별집계!Z6/월별집계!Y6-1)", RATE),
       ("전년동월 대비", "=IF(월별집계!N6<=0,0,월별집계!Z6/월별집계!N6-1)", RATE),
-      ("예산 부족 예상", f'=COUNTIF({VR("W")},"부족 예상")', '0"건"'), ("예산 주의", f'=COUNTIF({VR("W")},"주의")', '0"건"'),
-      ("무예산 집행", f'=COUNTIF({VR("W")},"무예산")', '0"건"')]
+      ("분기 한도 초과(예상)", f'=COUNTIF({VR("AO")},"한도 초과")+COUNTIF({VR("AO")},"초과 예상")', '0"건"'), ("분기 한도 주의", f'=COUNTIF({VR("AO")},"주의")', '0"건"'),
+      ("무예산 집행", f'=COUNTIF({VR("AO")},"무예산")', '0"건"')]
 for k, (lab, f_, fm) in enumerate(kp):
     c = rp.cell(row=4, column=1 + k, value=lab); c.font = F(GRAY, size=9); c.fill = TOT; c.border = BOX; c.alignment = Alignment(horizontal="center")
     c = rp.cell(row=5, column=1 + k, value=f_); c.font = F(GREEN, bold=True, size=14); c.number_format = fm
@@ -835,7 +864,7 @@ for k in range(10):
     for c, src, fm in [(1, "A", None), (2, "B", None), (3, "C", None), (4, "D", NUM), (5, "E", RATE), (6, "G", None), (7, "J", None), (8, "M", None)]:
         put(rp, r, c, f"=주의대상!{src}{wr}", GREEN, fm, align="center" if c in (1, 6) else None, wrap=c == 8)
     rp.row_dimensions[r].height = 28
-for val, fill in (('"부족 예상"', "F8CBAD"), ('"주의"', "FFE699"), ('"무예산"', "D9C3E9")):
+for val, fill in (('"한도 초과"', "F8CBAD"), ('"초과 예상"', "FCE4D6"), ('"부족 예상"', "F8CBAD"), ('"주의"', "FFE699"), ('"무예산"', "D9C3E9")):
     rp.conditional_formatting.add("F9:F18", CellIsRule(operator="equal", formula=[val], fill=PatternFill("solid", fgColor=fill)))
 sec(rp, 20, "2. 원인 분석 (원인분석 시트에서 선택한 항목)")
 rp.merge_cells("A21:H21"); rp["A21"] = "=원인분석!A18"; rp["A21"].font = F(GREEN, bold=True)
@@ -888,7 +917,7 @@ checks = [
     ("예산판 ↔ 전표 당분기 대사", f'="차이 "&TEXT(계정변동!O{AT},"#,##0.0")', f'IF(ABS(계정변동!O{AT})<0.05,"OK","확인필요")', "예산판 추출 시점과 전표 기간 일치 여부 확인"),
     ("변동분석에 없는 조합 (전표)", f'=COUNTIFS({JR("V")},"N",{JR("A")},{S["yr"]})&"건"', f'IF(COUNTIFS({JR("V")},"N",{JR("A")},{S["yr"]})=0,"OK","확인필요")', "변동분석에 부서코드·G/L 행 추가"),
     ("변동분석에 없는 조합 (예산판)", f'=COUNTIFS({BR("Q")},"N",{BR("M")},{S["yr"]})&"행"', f'IF(COUNTIFS({BR("Q")},"N",{BR("M")},{S["yr"]})=0,"OK","확인필요")', "변동분석에 부서코드·G/L 행 추가"),
-    ("무예산 집행", f'=COUNTIF({VR("W")},"무예산")&"건"', f'IF(COUNTIF({VR("W")},"무예산")=0,"OK","참고")', "업무상 예외 - 전용·추가 배정 여부 확인"),
+    ("무예산 집행", f'=COUNTIF({VR("AO")},"무예산")&"건"', f'IF(COUNTIF({VR("AO")},"무예산")=0,"OK","참고")', "업무상 예외 - 전용·추가 배정 여부 확인"),
     ("원인분석 선택 항목", '=원인분석!$E$9&" · 당기 전표 "&COUNTIF(' + JR("Q") + ',"당기")&"건"', f'IF(COUNTIF({JR("Q")},"당기")>0,"OK","참고")', "원인분석 C5~C8 선택값 확인"),
 ]
 # ---- 입력양식: 실제 SAP 화면 양식이 정해지면 이 시트만 고쳐서 맞춘다 (VBA 불러오기가 사용) ----
@@ -930,13 +959,13 @@ for nm_, cols_, key in FORM:
 FSS_CODE = {"A000": "10000", "A100": "11000", "A110": "11100", "A120": "11200", "A130": "11300", "A140": "11400", "A200": "12000", "A300": "13000",
             "A900": "19000", "L000": "20000", "L100": "21000", "L110": "21100", "L120": "21200", "L130": "21300", "L200": "22000", "L900": "29000",
             "E000": "30000", "E100": "31000", "E200": "32000", "E300": "33000", "P100": "40000", "P110": "41000", "P120": "42000", "P130": "43000",
-            "P200": "50000", "P210": "51000", "P220": "52000", "P300": "60000", "P400": "70000", "P500": "80000", "P600": "90000"}
+            "P200": "50000", "P210": "51000", "P220": "52000", "P230": "53000", "P300": "60000", "P400": "70000", "P500": "80000", "P600": "90000"}
 BS_STD = [("A000", "자산총계"), ("A100", "운용자산"), ("A110", "현금및예치금"), ("A120", "유가증권"), ("A130", "대출채권"), ("A140", "투자부동산"),
           ("A200", "보험계약자산"), ("A300", "재보험계약자산"), ("A900", "기타자산"), ("L000", "부채총계"), ("L100", "보험계약부채"),
           ("L110", "최선추정부채(BEL)"), ("L120", "위험조정(RA)"), ("L130", "보험계약마진(CSM)"), ("L200", "재보험계약부채"), ("L900", "기타부채"),
           ("E000", "자본총계"), ("E100", "자본금"), ("E200", "이익잉여금"), ("E300", "기타포괄손익누계액")]
 PL_STD = [("P100", "보험손익"), ("P110", "보험수익"), ("P120", "보험서비스비용"), ("P130", "재보험손익"), ("P200", "투자손익"), ("P210", "투자수익"),
-          ("P220", "보험금융비용"), ("P300", "기타사업비용 (사업비)"), ("P400", "법인세차감전이익"), ("P500", "법인세비용"), ("P600", "당기순이익")]
+          ("P220", "보험금융비용"), ("P230", "재산관리비"), ("P300", "기타사업비용 (사업비)"), ("P400", "법인세차감전이익"), ("P500", "법인세비용"), ("P600", "당기순이익")]
 
 # ---------- 헤더설정: 불러오기가 찾는 열 이름
 hs = wb.create_sheet("헤더설정")
@@ -991,17 +1020,23 @@ def code_map(r):  # BS/PL 보조수식: 실제 코드 → 표준 코드 (코드�
             f'IFERROR(INDEX({MAPC("C")},MATCH($D{r}&"",{MAPC("F")},0)),$C{r}&"")))')
 
 # ---- v0.4: IFRS17(GMM) 사업비 배분 기준
-CC_ALLOC = {"1101": (.9, 0, .1, 0), "1201": (.7, 0, .2, .1), "1301": (.8, .05, .15, 0), "1401": (.4, .5, .1, 0), "1501": (1, 0, 0, 0),
-            "1502": (.7, .3, 0, 0), "1601": (.2, .7, .1, 0), "1602": (.1, .8, .1, 0), "1701": (.4, .1, .4, .1), "1801": (.1, 0, .6, .3),
-            "1901": (0, .9, .05, .05), "1902": (0, .9, .05, .05)}      # (비귀속, 신계약, 유지, 수금)
-GL_ALLOC = {"63501000": (0, 1, 0, 0), "63502000": (0, 0, .5, .5)}   # 계정 직접귀속 (코스트센터보다 우선)
+DEPT_ALLOC = {"D100": (0, .10, 0, .90), "D200": (0, .20, .10, .70), "D300": (.05, .15, 0, .80), "D400": (.50, .10, 0, .40),
+              "D500": (.15, 0, 0, .85), "D600": (.75, .10, 0, .15), "D700": (.10, .40, .10, .40), "D800": (0, .60, .30, .10),
+              "D900": (.90, .05, .05, 0), "D950": (0, .30, 0, .70)}   # 공통비 부서별 대체비율 (신계약, 유지, 수금, 비귀속)
+INV_DEPTS = ["D950"]; INV_RATE = {2025: 0.65, 2026: 0.70}           # 투자관련부서 유지비 공통비 → 재산관리비 (연 1회 변경)
+CC2DEPT = {c[0]: c[2] for c in CCS}
 PFS = [("PF01", "보장성", "GMM"), ("PF02", "저축성", "GMM"), ("PF03", "단체(단기)", "PAA"), ("PF04", "변액", "VFA")]
 PF_DRV = {"PF01": (.55, .50, .50), "PF02": (.20, .30, .30), "PF03": (.10, .08, .08), "PF04": (.15, .12, .12)}  # (신계약, 유지, 수금)
-def alloc_of(e):
-    return GL_ALLOC.get(e["gl"]) or CC_ALLOC[e["cc"]]
-ATT = {}  # (y, m) -> [비귀속, 신계약, 유지, 수금] 원
+def alloc_of(e):   # → [비귀속, 신계약, 유지, 수금, 재산관리비] 비율
+    if e["gl"] in DIRECT:
+        return [1.0 if DIRECT[e["gl"]] == c else 0.0 for c in ("비귀속", "신계약비", "유지비", "수금비")] + [0.0]
+    d = CC2DEPT[e["cc"]]
+    inv = INV_RATE.get(e["y"], 0) if (e["gl"] not in NATURE_OTHER and d in INV_DEPTS) else 0.0
+    sn, mt, cl, na = DEPT_ALLOC.get(d, (0, 0, 0, 1))
+    return [(1 - inv) * na, (1 - inv) * sn, (1 - inv) * mt, (1 - inv) * cl, inv]
+ATT = {}  # (y, m) -> [비귀속, 신계약, 유지, 수금, 재산관리비] 원
 for e in E:
-    a = ATT.setdefault((e["y"], e["m"]), [0, 0, 0, 0])
+    a = ATT.setdefault((e["y"], e["m"]), [0, 0, 0, 0, 0])
     for i, rt in enumerate(alloc_of(e)): a[i] += e["amt"] * rt
 irng = random.Random(41)
 EXPROWS = []  # 예정사업비: 직전 12개월 실제 평균 기준 (계리 가정 대용)
@@ -1020,7 +1055,7 @@ BS_ITEMS = [("A000", "자산총계", "자산", 1), ("A100", "운용자산", "자
             ("L120", "위험조정(RA)", "부채", 3), ("L130", "보험계약마진(CSM)", "부채", 3), ("L200", "재보험계약부채", "부채", 2), ("L900", "기타부채", "부채", 2),
             ("E000", "자본총계", "자본", 1), ("E100", "자본금", "자본", 2), ("E200", "이익잉여금", "자본", 2), ("E300", "기타포괄손익누계액", "자본", 2)]
 PL_ITEMS = [("P100", "보험손익", "손익", 1), ("P110", "보험수익", "수익", 2), ("P120", "보험서비스비용", "비용", 2), ("P130", "재보험손익", "손익", 2),
-            ("P200", "투자손익", "손익", 1), ("P210", "투자수익", "수익", 2), ("P220", "보험금융비용", "비용", 2),
+            ("P200", "투자손익", "손익", 1), ("P210", "투자수익", "수익", 2), ("P220", "보험금융비용", "비용", 2), ("P230", "재산관리비", "비용", 2),
             ("P300", "기타사업비용 (사업비)", "비용", 1), ("P400", "법인세차감전이익", "손익", 1), ("P500", "법인세비용", "비용", 1), ("P600", "당기순이익", "손익", 1)]
 brng = random.Random(23)
 BSROWS, PLROWS = [], []
@@ -1040,8 +1075,8 @@ for i, (y, m) in enumerate(MONTHS):
     p = {"P110": n(62000, .003, .03), "P120": n(50500, .003, .04), "P130": -1100 + brng.uniform(-200, 200),
          "P210": n(9500, 0, .08), "P220": n(7600, .003, .02)}
     p = {k: round(x * MIL, -3) for k, x in p.items()}
-    p["P300"] = round(ATT[(y, m)][0])
-    p["P100"] = p["P110"] - p["P120"] + p["P130"]; p["P200"] = p["P210"] - p["P220"]
+    p["P300"] = round(ATT[(y, m)][0]); p["P230"] = round(ATT[(y, m)][4])
+    p["P100"] = p["P110"] - p["P120"] + p["P130"]; p["P200"] = p["P210"] - p["P220"] - p["P230"]
     p["P400"] = p["P100"] + p["P200"] - p["P300"]; p["P500"] = round(p["P400"] * 0.22, -3); p["P600"] = p["P400"] - p["P500"]
     for code, nm, cls, lv in PL_ITEMS:
         if m == 1: cum[code] = 0
@@ -1140,21 +1175,21 @@ for m in range(1, 13):
     put(cd, r, 3, f'=SUMIFS({JR("P")},{JR("M")},({S["yr"]}-1)*12+{m})', GREEN, NUM)
     put(cd, r, 4, f'=SUMIFS({BR("O")},{BR("M")},{S["yr"]},{BR("N")},ROUNDUP({m}/3,0))/3', GREEN, NUM)
 CDB = 19  # 부서별
-header(cd, CDB, ["부서코드", "부서명", "연간가용", "누계실적", "예상연간", "예상소진율", "판정"], h=30)
+header(cd, CDB, ["부서코드", "부서명", "분기 한도", "분기 실적", "분기말 예상", "분기 소진율", "판정"], h=30)
 DL = list(DEPTS)
 for k, d in enumerate(DL):
     r = CDB + 1 + k
     put(cd, r, 1, d, BLUE, align="center")
     put(cd, r, 2, f'=IFERROR(INDEX(부서매핑!$D$5:$D$504,MATCH($A{r},부서매핑!$C$5:$C$504,0)),$A{r})', GREEN)
-    for c, col in ((3, "P"), (4, "Q"), (5, "U")):
+    for c, col in ((3, "AJ"), (4, "AK"), (5, "AM")):
         put(cd, r, c, f'=SUMIFS({VR(col)},{VR("A")},$A{r})', GREEN, NUM)
     put(cd, r, 6, f"=IF(C{r}=0,0,E{r}/C{r})", fmt=PCT)
-    put(cd, r, 7, f'=IF(C{r}=0,"-",IF(F{r}>{S["short"]},"부족 예상",IF(F{r}>{S["warn"]},"주의","여유")))', GREEN, align="center")
+    put(cd, r, 7, f'=IF(C{r}=0,"-",IF(D{r}>C{r},"한도 초과",IF(F{r}>{S["short"]},"초과 예상",IF(F{r}>{S["warn"]},"주의","여유"))))', GREEN, align="center")
 CDC = 30  # 판정 분포
-header(cd, CDC, ["예산 판정", "건수"], h=20)
-STAT = ["여유", "주의", "부족 예상", "무예산"]
+header(cd, CDC, ["분기 판정", "건수"], h=20)
+STAT = ["여유", "주의", "초과 예상", "한도 초과", "무예산"]
 for k, s_ in enumerate(STAT):
-    put(cd, CDC + 1 + k, 1, s_, align="center"); put(cd, CDC + 1 + k, 2, f'=COUNTIF({VR("W")},A{CDC+1+k})', GREEN, "0")
+    put(cd, CDC + 1 + k, 1, s_, align="center"); put(cd, CDC + 1 + k, 2, f'=COUNTIF({VR("AO")},A{CDC+1+k})', GREEN, "0")
 CDD = 37  # 계정별
 header(cd, CDD, ["G/L 계정", "계정명", "당월", "전년동월", "증감"], h=20)
 for i in range(len(sgl)):
@@ -1186,7 +1221,7 @@ KPI = [("총자산", bsv("A000", S["P"]), bsv("A000", S["P"] + "-12"), "전년�
        ("사업비 누계", f'SUMIFS({JR("P")},{JR("M")},">="&({S["yr"]}*12+1),{JR("M")},"<="&{S["P"]})',
         f'SUMIFS({JR("P")},{JR("M")},">="&(({S["yr"]}-1)*12+1),{JR("M")},"<="&({S["P"]}-12))', "전년 누계"),
        ("사업비 당월", "월별집계!Z6", "월별집계!Y6", "전월"),
-       ("예산 부족 예상", f'COUNTIF({VR("W")},"부족 예상")', f'COUNTIF({VR("W")},"주의")', "주의 건수")]
+       ("분기 한도 초과(예상)", f'COUNTIF({VR("AO")},"한도 초과")+COUNTIF({VR("AO")},"초과 예상")', f'COUNTIF({VR("AO")},"주의")', "주의 건수")]
 for k, (lab, a, b, basis) in enumerate(KPI):
     r = CDG + 1 + k
     put(cd, r, 1, lab, bold=True); put(cd, r, 2, "=" + a, GREEN, NUM0 if k < 6 else "0"); put(cd, r, 3, "=" + b, GREEN, NUM0 if k < 6 else "0")
@@ -1198,7 +1233,7 @@ CD_LAYOUT = dict(CDA=CDA, CDB=CDB, CDC=CDC, CDD=CDD, CDE=CDE, CDF=CDF, CDG=CDG, 
 db = wb.create_sheet("대시보드")
 db["A1"] = f'={S["co"]}&" TRACE 대시보드 ("&{plabel(S["P"])}&")"'; db["A1"].font = F(bold=True, size=16)
 db["A2"] = f'="단위: "&{S["ur"]}&" · 자가진단: "&자가진단!$B$4&" · 3자 대사: "&계정변동!$P${AT}'; db["A2"].font = F(GRAY, size=9)
-tiles = [(0, "총자산"), (1, "자본총계"), (2, "CSM"), (3, "당기순이익 누계"), (4, "사업비 누계"), (6, "예산 부족 예상")]
+tiles = [(0, "총자산"), (1, "자본총계"), (2, "CSM"), (3, "당기순이익 누계"), (4, "사업비 누계"), (6, "분기 한도 초과(예상)")]
 for k, (ki, lab) in enumerate(tiles):
     c0 = 1 + k * 2
     r = CDG + 1 + ki
@@ -1217,16 +1252,16 @@ def place(ch, anchor, w=15.5, h=7.2):
 c1 = BarChart(); c1.type = "col"; c1.title = "월별 사업비 (당해 vs 전년)"; c1.y_axis.numFmt = "#,##0"
 c1.add_data(Reference(cd, min_col=2, max_col=3, min_row=CDA, max_row=CDA + 12), titles_from_data=True)
 c1.set_categories(Reference(cd, min_col=1, min_row=CDA + 1, max_row=CDA + 12)); place(c1, "A8")
-c2 = BarChart(); c2.type = "bar"; c2.title = "부서별 연간가용 vs 예상연간"; c2.x_axis.numFmt = "#,##0"
+c2 = BarChart(); c2.type = "bar"; c2.title = "부서별 분기 한도 vs 분기말 예상"; c2.x_axis.numFmt = "#,##0"
 c2.add_data(Reference(cd, min_col=3, max_col=3, min_row=CDB, max_row=CDB + len(DL)), titles_from_data=True)
 c2.add_data(Reference(cd, min_col=5, max_col=5, min_row=CDB, max_row=CDB + len(DL)), titles_from_data=True)
 c2.set_categories(Reference(cd, min_col=2, min_row=CDB + 1, max_row=CDB + len(DL))); place(c2, "G8")
 c3 = BarChart(); c3.type = "bar"; c3.title = "계정별 당월 vs 전년동월"
 c3.add_data(Reference(cd, min_col=3, max_col=4, min_row=CDD, max_row=CDD + len(sgl)), titles_from_data=True)
 c3.set_categories(Reference(cd, min_col=2, min_row=CDD + 1, max_row=CDD + len(sgl))); place(c3, "A23", h=9)
-c4 = DoughnutChart(); c4.title = "예산 판정 분포 (부서×계정)"
-c4.add_data(Reference(cd, min_col=2, min_row=CDC, max_row=CDC + 4), titles_from_data=True)
-c4.set_categories(Reference(cd, min_col=1, min_row=CDC + 1, max_row=CDC + 4)); place(c4, "G23", h=9)
+c4 = DoughnutChart(); c4.title = "분기 한도 판정 분포 (부서×계정)"
+c4.add_data(Reference(cd, min_col=2, min_row=CDC, max_row=CDC + 5), titles_from_data=True)
+c4.set_categories(Reference(cd, min_col=1, min_row=CDC + 1, max_row=CDC + 5)); place(c4, "G23", h=9)
 c5 = LineChart(); c5.title = "재무상태 추이 (최근 12개월)"; c5.y_axis.numFmt = "#,##0"
 c5.add_data(Reference(cd, min_col=3, max_col=5, min_row=CDE, max_row=CDE + 12), titles_from_data=True)
 c5.set_categories(Reference(cd, min_col=2, min_row=CDE + 1, max_row=CDE + 12)); place(c5, "A42")
@@ -1242,7 +1277,7 @@ for k in range(10):
         put(db, r, c, f"=주의대상!{src}{wr}", GREEN, fm, align="center" if c in (1, 6) else None)
     for c in range(8, 13): put(db, r, c, None)
     db.merge_cells(start_row=r, start_column=7, end_row=r, end_column=12)
-for val, fill in (('"부족 예상"', "F8CBAD"), ('"주의"', "FFE699"), ('"무예산"', "D9C3E9")):
+for val, fill in (('"한도 초과"', "F8CBAD"), ('"초과 예상"', "FCE4D6"), ('"부족 예상"', "F8CBAD"), ('"주의"', "FFE699"), ('"무예산"', "D9C3E9")):
     db.conditional_formatting.add("F60:F69", CellIsRule(operator="equal", formula=[val], fill=PatternFill("solid", fgColor=fill)))
 sec(db, 71, "선택 항목 원인 (원인분석 시트)")
 db.merge_cells("A72:L73"); db["A72"] = "=원인분석!A18"; db["A72"].font = F(GREEN, bold=True)
@@ -1266,49 +1301,45 @@ for i, (code, nm) in enumerate(FAC):
     put(os_, r, 6, FSS_FACN[code], BLUE)
 FMC = lambda col: f"입력옵션!${col}${FMAP0}:${col}${FMAP1}"
 
-# ---------- 배분기준 (입력)
-ab = wb.create_sheet("배분기준")
-title(ab, "배분기준 (IFRS 17 사업비 귀속)", "관리회계 사업비 배분 기준 · 계정 직접귀속이 코스트센터 비율보다 우선 · 배분표에 없는 코스트센터는 전액 비귀속")
-sec(ab, 4, "1. 코스트센터 배분율")
-header(ab, 5, ["코스트센터", "코스트센터명", "비귀속", "신계약비", "유지비", "수금비", "합계"], h=20)
-ccname = {c[0]: c[1] for c in CCS}
-for i in range(50):
-    r = 6 + i
-    if i < len(CC_ALLOC):
-        cc_, rt = list(CC_ALLOC.items())[i]
-        c = put(ab, r, 1, cc_, BLUE, align="center"); c.number_format = "@"
-        put(ab, r, 2, ccname[cc_], BLUE)
-        for j, v in enumerate(rt): put(ab, r, 3 + j, v, BLUE, PCT, fill=YEL)
-    else:
-        for c in range(1, 7): put(ab, r, c, None, BLUE, PCT if c > 2 else ("@" if c == 1 else None))
-    put(ab, r, 7, f'=IF($A{r}="",0,SUM(C{r}:F{r}))', fmt=PCT)
-sec(ab, 58, "2. 계정 직접귀속 (코스트센터보다 우선)")
-header(ab, 59, ["G/L 계정", "계정명", "비귀속", "신계약비", "유지비", "수금비", "합계"], h=20)
-for i in range(20):
-    r = 60 + i
-    if i < len(GL_ALLOC):
-        gl_, rt = list(GL_ALLOC.items())[i]
-        c = put(ab, r, 1, gl_, BLUE, align="center"); c.number_format = "@"
-        put(ab, r, 2, GLNAME[gl_], BLUE)
-        for j, v in enumerate(rt): put(ab, r, 3 + j, v, BLUE, PCT, fill=YEL)
-    else:
-        for c in range(1, 7): put(ab, r, c, None, BLUE, PCT if c > 2 else ("@" if c == 1 else None))
-    put(ab, r, 7, f'=IF($A{r}="",0,SUM(C{r}:F{r}))', fmt=PCT)
-sec(ab, 83, "3. 포트폴리오 배분 드라이버 (귀속 사업비 → 포트폴리오)")
-header(ab, 84, ["포트폴리오", "포트폴리오명", "측정모형", "신계약비\n(신계약 건수)", "유지비\n(보유계약)", "수금비\n(수입보험료)", "비고"], h=32)
+# ---------- 계정대체기준 (입력)
+ab = wb.create_sheet("계정대체기준")
+title(ab, "계정대체기준 (IFRS 4·9 → IFRS 17)", "① 직접대체 계정은 계정매핑 시트에서 지정 · ② 투자관련부서의 유지비 성격 공통비 → 재산관리비 · ③ 남은 공통비 → 부서별 비율")
+sec(ab, 4, "1. 재산관리비 대체 (투자관련부서가 쓴 유지비 성격 공통비)")
+header(ab, 5, ["투자관련부서", "부서명"], h=20); header(ab, 5, ["적용연도", "재산관리비 비율"], start=4, h=20)
 for i in range(10):
-    r = 85 + i
+    r = 6 + i
+    d_ = INV_DEPTS[i] if i < len(INV_DEPTS) else None
+    put(ab, r, 1, d_, BLUE, align="center"); put(ab, r, 2, DEPTS.get(d_) if d_ else None, BLUE)
+    yr_ = sorted(INV_RATE)[i] if i < len(INV_RATE) else None
+    put(ab, r, 4, yr_, BLUE, "0", align="center"); put(ab, r, 5, INV_RATE.get(yr_) if yr_ else None, BLUE, PCT, fill=YEL if yr_ else None)
+ab.cell(row=16, column=1, value="비율은 1년에 한 번 바뀝니다. 새 연도는 아래 행에 추가하세요. 전표의 회계연도에 맞는 비율을 씁니다.").font = F(GRAY, size=9)
+sec(ab, 18, "2. 부서별 공통비 대체비율 (재산관리비로 넘긴 뒤 남은 공통비)")
+header(ab, 19, ["부서코드", "부서명", "신계약비", "유지비", "수금비", "비귀속", "합계"], h=20)
+for i in range(30):
+    r = 20 + i
+    if i < len(DEPT_ALLOC):
+        d_, rt = list(DEPT_ALLOC.items())[i]
+        put(ab, r, 1, d_, BLUE, align="center"); put(ab, r, 2, DEPTS[d_], BLUE)
+        for j, v in enumerate(rt): put(ab, r, 3 + j, v, BLUE, PCT, fill=YEL)
+    else:
+        for c in range(1, 7): put(ab, r, c, None, BLUE, PCT if c > 2 else None)
+    put(ab, r, 7, f'=IF($A{r}="",0,SUM(C{r}:F{r}))', fmt=PCT)
+ab.cell(row=50, column=1, value="표에 없는 부서의 공통비는 전액 비귀속으로 처리하고 자가진단이 알려줍니다.").font = F(GRAY, size=9)
+sec(ab, 52, "3. 상품·계약집단 귀속 드라이버 (상품·증권번호별 귀속 결과를 받기 전까지 포트폴리오 비율로 대신)")
+header(ab, 53, ["포트폴리오", "포트폴리오명", "측정모형", "신계약비\n(신계약 건수)", "유지비\n(보유계약)", "수금비\n(수입보험료)", "비고"], h=32)
+for i in range(10):
+    r = 54 + i
     if i < len(PFS):
         pf, pfn, mdl = PFS[i]
         put(ab, r, 1, pf, BLUE, align="center"); put(ab, r, 2, pfn, BLUE); put(ab, r, 3, mdl, BLUE, align="center")
         for j, v in enumerate(PF_DRV[pf]): put(ab, r, 4 + j, v, BLUE, PCT, fill=YEL)
-        put(ab, r, 7, "특별계정 구분계리 · 분석 제외(참고)" if mdl == "VFA" else ("CSM 없음 · 손익 반영" if mdl == "PAA" else "분석 대상"), GRAY)
+        put(ab, r, 7, "변액 · 특별계정 (CSM 조정 · 손익 영향 분석 포함)" if mdl == "VFA" else ("CSM 없음 · 손익 반영" if mdl == "PAA" else "분석 대상"), GRAY)
     else:
         for c in range(1, 8): put(ab, r, c, None, BLUE, PCT if 4 <= c <= 6 else None)
-put(ab, 95, 3, "합계", bold=True, fill=TOT)
-for c in (4, 5, 6): put(ab, 95, c, f"=SUM({CL(c)}85:{CL(c)}94)", fmt=PCT, bold=True, fill=TOT)
-dv = DataValidation(type="list", formula1='"GMM,PAA,VFA"'); ab.add_data_validation(dv); dv.add("C85:C94")
-widths(ab, [12, 18, 10, 12, 12, 12, 34]); ab.freeze_panes = "A6"
+put(ab, 64, 3, "합계", bold=True, fill=TOT)
+for c in (4, 5, 6): put(ab, 64, c, f"=SUM({CL(c)}54:{CL(c)}63)", fmt=PCT, bold=True, fill=TOT)
+dv = DataValidation(type="list", formula1='"GMM,PAA,VFA"'); ab.add_data_validation(dv); dv.add("C54:C63")
+widths(ab, [13, 18, 10, 12, 14, 12, 34]); ab.freeze_panes = "A4"
 
 # ---------- 예정사업비 (입력)
 EX_HDR = ["회계연도", "기간", "포트폴리오", "포트폴리오명", "신계약비", "유지비", "수금비"]
@@ -1346,13 +1377,13 @@ rf.freeze_panes = "A5"; rf.auto_filter.ref = "A4:P4"; widths(rf, [8, 5, 10, 11, 
 
 # ---------- IFRS17_사업비 (분석)
 ia = wb.create_sheet("IFRS17_사업비")
-title(ia, "IFRS 17 (GMM) 사업비 영향", "사업비 전표 → 귀속 배분 → 포트폴리오 → 예정 대비 경험차이 → CSM·당기손익 · VFA(변액)는 구분계리로 제외 · 금액: 보고단위")
+title(ia, "IFRS 17 사업비 영향 (GMM · VFA · PAA)", "사업비 전표 → 계정대체 → 포트폴리오 → 예정 대비 경험차이 → CSM(GMM·VFA)·당기손익 · 금액: 보고단위")
 ia["A3"] = f'="기준: "&{plabel(S["P"])}&" · 단위: "&{S["ur"]}'; ia["A3"].font = F(GREEN, size=9)
 SUMR = 5
 ia.merge_cells(f"A{SUMR}:H{SUMR+1}")
-cats = [("비귀속", "Y"), ("신계약비", "Z"), ("유지비", "AA"), ("수금비", "AB")]
+cats = [("비귀속", "Y"), ("신계약비", "Z"), ("유지비", "AA"), ("수금비", "AB"), ("재산관리비", "AD")]
 A0 = 9   # 1. 배분 요약
-sec(ia, A0 - 1, "1. 사업비 배분 요약 (전표 기준)")
+sec(ia, A0 - 1, "1. 계정대체 결과 요약 (전표 기준)")
 header(ia, A0, ["구분", "당월", "전월", "누계", "당월 비중"], h=20)
 for i, (nm, col) in enumerate(cats):
     r = A0 + 1 + i
@@ -1360,14 +1391,15 @@ for i, (nm, col) in enumerate(cats):
     put(ia, r, 2, f'=SUMIFS({JR(col)},{JR("M")},{S["P"]})', GREEN, NUM)
     put(ia, r, 3, f'=SUMIFS({JR(col)},{JR("M")},{S["P"]}-1)', GREEN, NUM)
     put(ia, r, 4, f'=SUMIFS({JR(col)},{JR("M")},">="&({S["yr"]}*12+1),{JR("M")},"<="&{S["P"]})', GREEN, NUM)
-    put(ia, r, 5, f'=IF($B${A0+5}=0,0,B{r}/$B${A0+5})', fmt=PCT1)
-put(ia, A0 + 5, 1, "합계", bold=True, fill=TOT)
-for c in (2, 3, 4): put(ia, A0 + 5, c, f"=SUM({CL(c)}{A0+1}:{CL(c)}{A0+4})", fmt=NUM, bold=True, fill=TOT)
-put(ia, A0 + 5, 5, f"=SUM(E{A0+1}:E{A0+4})", fmt=PCT1, bold=True, fill=TOT)
-B0 = A0 + 8  # 2. 포트폴리오별 경험차이
+    put(ia, r, 5, f'=IF($B${A0+6}=0,0,B{r}/$B${A0+6})', fmt=PCT1)
+put(ia, A0 + 6, 1, "합계 (= 전표 사업비)", bold=True, fill=TOT)
+for c in (2, 3, 4): put(ia, A0 + 6, c, f"=SUM({CL(c)}{A0+1}:{CL(c)}{A0+5})", fmt=NUM, bold=True, fill=TOT)
+put(ia, A0 + 6, 5, f"=SUM(E{A0+1}:E{A0+5})", fmt=PCT1, bold=True, fill=TOT)
+ia.cell(row=A0 + 7, column=1, value="재산관리비는 IFRS 17 이행현금흐름 밖 (PL 투자손익에서 차감) · 비귀속은 기타사업비용").font = F(GRAY, size=9)
+B0 = A0 + 10  # 2. 포트폴리오별 경험차이
 sec(ia, B0 - 1, "2. 포트폴리오별 경험차이 (당월, 예정 − 실제 · 음수 = 불리)")
 header(ia, B0, ["포트폴리오", "포트폴리오명", "측정모형", "구분", "실제", "예정", "경험차이", "반영처"], h=20)
-PFR = lambda col: f"배분기준!${col}$85:${col}$94"
+PFR = lambda col: f"계정대체기준!${col}$54:${col}$63"
 rows_b = []
 for i, (pf, pfn, mdl) in enumerate(PFS):
     for j, (cat, drvcol, excol) in enumerate((("신계약비", "D", "J"), ("유지비", "E", "K"), ("수금비", "F", "L"))):
@@ -1379,18 +1411,18 @@ for i, (pf, pfn, mdl) in enumerate(PFS):
         put(ia, r, 5, f'=$B${A0+2+j}*IFERROR(INDEX({PFR(drvcol)},MATCH($A{r},{PFR("A")},0)),0)', GREEN, NUM)
         put(ia, r, 6, f'=SUMIFS({EXR(excol)},{EXR("I")},{S["P"]},{EXR("C")},$A{r})', GREEN, NUM)
         put(ia, r, 7, f"=F{r}-E{r}", fmt='+#,##0.0;-#,##0.0;"-"', bold=True)
-        put(ia, r, 8, f'=IF(C{r}="VFA","구분계리(제외)",IF(AND(D{r}="신계약비",C{r}="GMM"),"CSM 조정",IF(AND(D{r}="신계약비",C{r}="PAA"),"당기손익","당기손익(보험서비스결과)")))', align="center")
+        put(ia, r, 8, f'=IF(AND(D{r}="신계약비",OR(C{r}="GMM",C{r}="VFA")),"CSM 조정 ("&C{r}&")",IF(D{r}="신계약비","당기손익","당기손익(보험서비스결과)"))', align="center")
 B1 = rows_b[-1]
 BT = B1 + 1
-for k, (lab, crit) in enumerate((("CSM 조정 (GMM 신계약비)", '"CSM 조정"'), ("당기손익 (유지·수금, PAA 신계약비)", '"당기손익*"'), ("구분계리 (VFA · 참고)", '"구분계리*"'))):
+for k, (lab, crit) in enumerate((("CSM 조정 (GMM 신계약비)", '"CSM 조정 (GMM)"'), ("CSM 조정 (VFA 신계약비)", '"CSM 조정 (VFA)"'), ("당기손익 (유지·수금, PAA 신계약비)", '"당기손익*"'))):
     r = BT + k
     put(ia, r, 1, lab, bold=True, fill=TOT); ia.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
     put(ia, r, 7, f"=SUMIFS($G${B0+1}:$G${B1},$H${B0+1}:$H${B1},{crit})", fmt='+#,##0.0;-#,##0.0;"-"', bold=True, fill=TOT)
     put(ia, r, 8, None, fill=TOT)
-for val, fill in (('"CSM 조정"', "E3EBF7"), ('"구분계리(제외)"', "EEF1F0")):
+for val, fill in (('"CSM 조정 (GMM)"', "E3EBF7"), ('"CSM 조정 (VFA)"', "E8E3F3")):
     ia.conditional_formatting.add(f"H{B0+1}:H{B1}", CellIsRule(operator="equal", formula=[val], fill=PatternFill("solid", fgColor=fill)))
 ia.conditional_formatting.add(f"G{B0+1}:G{B1}", CellIsRule(operator="lessThan", formula=["0"], font=Font(color="C00000", bold=True)))
-C0_ = BT + 5  # 3. 변동표 대사
+C0_ = BT + 6  # 3. 변동표 대사
 sec(ia, C0_ - 1, "3. 변동표 대사 (계리 결과 '경험조정-신계약비' CSM vs TRACE 추정)")
 header(ia, C0_, ["포트폴리오", "측정모형", "계리 F31 (CSM)", "TRACE 추정", "차이", "판정"], h=20)
 for i, (pf, pfn, mdl) in enumerate(PFS):
@@ -1403,24 +1435,30 @@ for i, (pf, pfn, mdl) in enumerate(PFS):
     put(ia, r, 6, f'=IF(B{r}="PAA","해당없음 (CSM 없음)",IF(ABS(E{r})<0.5,"일치","차이 확인"))', align="center")
 C1_ = C0_ + len(PFS)
 ia.conditional_formatting.add(f"F{C0_+1}:F{C1_}", CellIsRule(operator="equal", formula=['"차이 확인"'], fill=PatternFill("solid", fgColor="FFC7CE")))
+def bridge(d0, mdl, label):
+    sec(ia, d0 - 1, label)
+    header(ia, d0, ["요인코드", "변동요인", "BEL", "RA", "CSM", "사업비 관련"], h=20)
+    for i, (code, nm) in enumerate(FAC):
+        r = d0 + 1 + i
+        bold_ = code in ("F00", "F99")
+        put(ia, r, 1, code, align="center", bold=bold_, fill=TOT if bold_ else None)
+        put(ia, r, 2, nm, bold=bold_, fill=TOT if bold_ else None)
+        for c, col in ((3, "M"), (4, "N"), (5, "O")):
+            put(ia, r, c, f'=SUMIFS({RFR(col)},{RFR("L")},{S["P"]},{RFR("P")},$A{r},{RFR("E")},"{mdl}")', GREEN, NUM0, bold=bold_, fill=TOT if bold_ else None)
+        put(ia, r, 6, "사업비" if code in ("F21", "F31") else None, align="center", bold=True)
+    d1 = d0 + len(FAC)
+    r21, r31 = d0 + 1 + [f[0] for f in FAC].index("F21"), d0 + 1 + [f[0] for f in FAC].index("F31")
+    for k, (lab, f_) in enumerate((("CSM 당월 변동 (기말 − 기초)", f"=E{d1}-E{d0+1}"), ("그중 사업비 관련 (F21 + F31)", f"=E{r21}+E{r31}"))):
+        r = d1 + 1 + k
+        put(ia, r, 2, lab, bold=True, fill=SUB); put(ia, r, 5, f_, fmt='+#,##0;-#,##0;"-"', bold=True, fill=SUB)
+    ia.conditional_formatting.add(f"F{d0+1}:F{d1}", CellIsRule(operator="equal", formula=['"사업비"'], fill=PatternFill("solid", fgColor="E3EBF7")))
+    return d1, r21, r31
 D0 = C1_ + 3  # 4. CSM 브리지 (GMM)
-sec(ia, D0 - 1, "4. GMM 변동 브리지 (보장성 + 저축성, 당월)")
-header(ia, D0, ["요인코드", "변동요인", "BEL", "RA", "CSM", "사업비 관련"], h=20)
-for i, (code, nm) in enumerate(FAC):
-    r = D0 + 1 + i
-    bold_ = code in ("F00", "F99")
-    put(ia, r, 1, code, align="center", bold=bold_, fill=TOT if bold_ else None)
-    put(ia, r, 2, nm, bold=bold_, fill=TOT if bold_ else None)
-    for c, col in ((3, "M"), (4, "N"), (5, "O")):
-        put(ia, r, c, f'=SUMIFS({RFR(col)},{RFR("L")},{S["P"]},{RFR("P")},$A{r},{RFR("E")},"GMM")', GREEN, NUM0, bold=bold_, fill=TOT if bold_ else None)
-    put(ia, r, 6, "사업비" if code in ("F21", "F31") else None, align="center", bold=True)
-D1 = D0 + len(FAC)
-R21, R31 = D0 + 1 + [f[0] for f in FAC].index("F21"), D0 + 1 + [f[0] for f in FAC].index("F31")
-for k, (lab, f_) in enumerate((("CSM 당월 변동 (기말 − 기초)", f"=E{D1}-E{D0+1}"), ("그중 사업비 관련 (F21 + F31)", f"=E{R21}+E{R31}"))):
-    r = D1 + 1 + k
-    put(ia, r, 2, lab, bold=True, fill=SUB); put(ia, r, 5, f_, fmt='+#,##0;-#,##0;"-"', bold=True, fill=SUB)
-ia.conditional_formatting.add(f"F{D0+1}:F{D1}", CellIsRule(operator="equal", formula=['"사업비"'], fill=PatternFill("solid", fgColor="E3EBF7")))
-E0 = D1 + 5  # 5. 신계약비 증가 기여 (부서 × 계정)
+D1, R21, R31 = bridge(D0, "GMM", "4. GMM 변동 브리지 (보장성 + 저축성, 당월)")
+DV0 = D1 + 6  # 4-2. VFA 브리지
+DV1, RV21, RV31 = bridge(DV0, "VFA", "4-2. VFA 변동 브리지 (변액, 당월)")
+D1_, D0_ = D1, D0
+E0 = DV1 + 5  # 5. 신계약비 증가 기여 (부서 × 계정)
 sec(ia, E0 - 1, "5. 신계약비 증가 기여 (부서 × 계정, 당월 − 전월, 귀속 신계약비 기준)")
 header(ia, E0, ["순위", "부서", "계정", "당월", "전월", "증감"], h=20)
 header(ia, 6, ["키", "당월 신계약", "전월 신계약", "증감", "정렬키"], start=12, fill=GRAYH, h=20)
@@ -1454,15 +1492,16 @@ ia[f"A{SUMR}"] = (f'="GMM CSM 당월 변동 "&TEXT(E{D1+1},"+#,##0;-#,##0;0")&" 
                   f'&"신계약비 실제가 예정보다 "&TEXT(ABS({nb_tot}),"#,##0.0")&IF({nb_tot}<0," 많았고"," 적었고")'
                   f'&IF(B{E0+1}="","",", 증가 기여 1위는 "&B{E0+1}&" "&C{E0+1}&" ("&TEXT(F{E0+1},"+#,##0.0;-#,##0.0;0")&")")'
                   f'&IF(B{F0+1}="","",", 대표 전표는 "&E{F0+1}&" \'"&F{F0+1}&"\' "&TEXT(H{F0+1},"#,##0.0"))&". "'
-                  f'&"당기손익 반영 경험차이 "&TEXT(G{BT+1},"+#,##0.0;-#,##0.0;0")&". 변액(VFA)은 구분계리로 제외."')
+                  f'&"당기손익 반영 경험차이 "&TEXT(G{BT+2},"+#,##0.0;-#,##0.0;0")&". "'
+                  f'&"VFA(변액) CSM 당월 변동 "&TEXT(E{DV1+1},"+#,##0;-#,##0;0")&" 중 사업비 관련 "&TEXT(E{DV1+2},"+#,##0.0;-#,##0.0;0")&"."')
 ia[f"A{SUMR}"].font = F(GREEN, bold=True); ia[f"A{SUMR}"].alignment = Alignment(wrap_text=True, vertical="top"); ia[f"A{SUMR}"].fill = BOXF
 ia.row_dimensions[SUMR].height = 30; ia.row_dimensions[SUMR + 1].height = 30
 widths(ia, [12, 26, 12, 14, 14, 30, 14, 22, 2, 2, 6, 14, 11, 11, 11, 9])
 ia.freeze_panes = "A8"
-IF_LAYOUT = dict(SUMR=SUMR, A0=A0, B0=B0, B1=B1, BT=BT, C0=C0_, C1=C1_, D0=D0, D1=D1, E0=E0, F0=F0)
+IF_LAYOUT = dict(SUMR=SUMR, A0=A0, B0=B0, B1=B1, BT=BT, C0=C0_, C1=C1_, D0=D0, D1=D1, DV0=DV0, DV1=DV1, E0=E0, F0=F0)
 
 # 대시보드: GMM CSM 변동 요인 차트 + 요약
-sec(db, 75, "IFRS 17 (GMM) 사업비 영향")
+sec(db, 75, "IFRS 17 사업비 영향 (GMM · VFA)")
 db.merge_cells("A76:L77"); db["A76"] = f"=IFRS17_사업비!A{SUMR}"; db["A76"].font = F(GREEN, bold=True)
 db["A76"].alignment = Alignment(wrap_text=True, vertical="top"); db["A76"].fill = BOXF
 c7 = BarChart(); c7.type = "bar"; c7.title = "GMM CSM 변동 요인 (당월)"; c7.x_axis.numFmt = "#,##0"
@@ -1470,12 +1509,16 @@ c7.add_data(Reference(ia, min_col=5, max_col=5, min_row=D0, max_row=D1 - 1), tit
 c7.set_categories(Reference(ia, min_col=2, min_row=D0 + 1, max_row=D1 - 1)); place(c7, "A79", w=31, h=8)
 
 IFRS17_CHECKS = [
-    ("배분율 합계 100%", f'="코스트센터 "&SUMPRODUCT((배분기준!$A$6:$A$55<>"")*(ABS(배분기준!$G$6:$G$55-1)>0.0001))&"행 · 계정 "&SUMPRODUCT((배분기준!$A$60:$A$79<>"")*(ABS(배분기준!$G$60:$G$79-1)>0.0001))&"행 · 포트폴리오 "&(ABS(배분기준!$D$95-1)+ABS(배분기준!$E$95-1)+ABS(배분기준!$F$95-1)>0.0001)*1',
-     'IF(SUMPRODUCT((배분기준!$A$6:$A$55<>"")*(ABS(배분기준!$G$6:$G$55-1)>0.0001))+SUMPRODUCT((배분기준!$A$60:$A$79<>"")*(ABS(배분기준!$G$60:$G$79-1)>0.0001))+(ABS(배분기준!$D$95-1)+ABS(배분기준!$E$95-1)+ABS(배분기준!$F$95-1)>0.0001)=0,"OK","확인필요")',
-     "배분기준 시트에서 합계가 100%가 아닌 행 수정"),
-    ("배분표에 없는 코스트센터", f'=SUMPRODUCT(({JR("A")}<>"")*(COUNTIF(배분기준!$A$6:$A$55,{JR("G")}&"")=0)*(COUNTIF(배분기준!$A$60:$A$79,{JR("F")}&"")=0))&"건 (전액 비귀속 처리)"',
-     f'IF(SUMPRODUCT(({JR("A")}<>"")*(COUNTIF(배분기준!$A$6:$A$55,{JR("G")}&"")=0)*(COUNTIF(배분기준!$A$60:$A$79,{JR("F")}&"")=0))=0,"OK","확인필요")',
-     "배분기준 코스트센터 표에 추가"),
+    ("대체비율 합계 100%", f'="부서 "&SUMPRODUCT((계정대체기준!$A$20:$A$49<>"")*(ABS(계정대체기준!$G$20:$G$49-1)>0.0001))&"행 · 포트폴리오 "&(ABS(계정대체기준!$D$64-1)+ABS(계정대체기준!$E$64-1)+ABS(계정대체기준!$F$64-1)>0.0001)*1',
+     'IF(SUMPRODUCT((계정대체기준!$A$20:$A$49<>"")*(ABS(계정대체기준!$G$20:$G$49-1)>0.0001))+(ABS(계정대체기준!$D$64-1)+ABS(계정대체기준!$E$64-1)+ABS(계정대체기준!$F$64-1)>0.0001)=0,"OK","확인필요")',
+     "계정대체기준 시트에서 합계가 100%가 아닌 행 수정"),
+    ("대체비율표에 없는 부서 (공통비)", f'=SUMPRODUCT(({JR("AE")}="공통비")*(COUNTIF(계정대체기준!$A$20:$A$49,{JR("N")})=0))&"건 (전액 비귀속 처리)"',
+     f'IF(SUMPRODUCT(({JR("AE")}="공통비")*(COUNTIF(계정대체기준!$A$20:$A$49,{JR("N")})=0))=0,"OK","확인필요")', "계정대체기준 부서별 비율표에 부서 추가"),
+    ("계정대체 전후 합계", f'="차이 "&TEXT(SUMIFS({JR("P")},{JR("M")},{S["P"]})-SUMIFS({JR("Y")},{JR("M")},{S["P"]})-SUMIFS({JR("Z")},{JR("M")},{S["P"]})-SUMIFS({JR("AA")},{JR("M")},{S["P"]})-SUMIFS({JR("AB")},{JR("M")},{S["P"]})-SUMIFS({JR("AD")},{JR("M")},{S["P"]}),"#,##0.0")',
+     f'IF(ABS(SUMIFS({JR("P")},{JR("M")},{S["P"]})-SUMIFS({JR("Y")},{JR("M")},{S["P"]})-SUMIFS({JR("Z")},{JR("M")},{S["P"]})-SUMIFS({JR("AA")},{JR("M")},{S["P"]})-SUMIFS({JR("AB")},{JR("M")},{S["P"]})-SUMIFS({JR("AD")},{JR("M")},{S["P"]}))<0.05,"OK","확인필요")',
+     "직접대체 계정 지정, 부서별 비율 합계 확인"),
+    ("PL 재산관리비 ↔ 재산관리비 대체액", f'="차이 "&TEXT({plv("P230", S["P"])}-SUMIFS({JR("AD")},{JR("M")},{S["P"]}),"#,##0.0")',
+     f'IF(ABS({plv("P230", S["P"])}-SUMIFS({JR("AD")},{JR("M")},{S["P"]}))<0.5,"OK","확인필요")', "투자관련부서 목록·재산관리비 비율, PL 재산관리비 범위 확인"),
     ("기준월 예정사업비 존재", f'=COUNTIF({EXR("I")},{S["P"]})&"행"', f'IF(COUNTIF({EXR("I")},{S["P"]})>0,"OK","확인필요")', "계리 예정사업비 기준월 자료 확인"),
     ("부채변동표 롤포워드", f'="차이 "&TEXT(SUMIFS({RFR("M")},{RFR("L")},{S["P"]},{RFR("P")},"<>F99")-SUMIFS({RFR("M")},{RFR("L")},{S["P"]},{RFR("P")},"F99"),"#,##0.0")&" / "&TEXT(SUMIFS({RFR("O")},{RFR("L")},{S["P"]},{RFR("P")},"<>F99")-SUMIFS({RFR("O")},{RFR("L")},{S["P"]},{RFR("P")},"F99"),"#,##0.0")',
      f'IF(ABS(SUMIFS({RFR("M")},{RFR("L")},{S["P"]},{RFR("P")},"<>F99")-SUMIFS({RFR("M")},{RFR("L")},{S["P"]},{RFR("P")},"F99"))+ABS(SUMIFS({RFR("N")},{RFR("L")},{S["P"]},{RFR("P")},"<>F99")-SUMIFS({RFR("N")},{RFR("L")},{S["P"]},{RFR("P")},"F99"))+ABS(SUMIFS({RFR("O")},{RFR("L")},{S["P"]},{RFR("P")},"<>F99")-SUMIFS({RFR("O")},{RFR("L")},{S["P"]},{RFR("P")},"F99"))<1,"OK","확인필요")',
@@ -1500,7 +1543,7 @@ EXTRA_CHECKS = [
     ("PL 당기순이익 검산", f'="차이 "&TEXT({plv("P100", S["P"])}+{plv("P200", S["P"])}-{plv("P300", S["P"])}-{plv("P500", S["P"])}-{plv("P600", S["P"])},"#,##0.0")',
      f'IF(ABS({plv("P100", S["P"])}+{plv("P200", S["P"])}-{plv("P300", S["P"])}-{plv("P500", S["P"])}-{plv("P600", S["P"])})<0.05,"OK","확인필요")', "보험손익+투자손익−사업비−법인세 = 당기순이익"),
     ("PL 기타사업비용 ↔ 비귀속 사업비", f'="차이 "&TEXT({plv("P300", S["P"])}-SUMIFS({JR("Y")},{JR("M")},{S["P"]}),"#,##0.0")',
-     f'IF(ABS({plv("P300", S["P"])}-SUMIFS({JR("Y")},{JR("M")},{S["P"]}))<0.5,"OK","확인필요")', "배분기준의 비귀속 비율과 PL 기타사업비용 범위 확인"),
+     f'IF(ABS({plv("P300", S["P"])}-SUMIFS({JR("Y")},{JR("M")},{S["P"]}))<0.5,"OK","확인필요")', "직접대체·부서별 비율의 비귀속과 PL 기타사업비용 범위 확인"),
 ] + IFRS17_CHECKS + [
 ]
 
@@ -1518,8 +1561,17 @@ for val, fill in (('"OK"', "C6EFCE"), ('"확인필요"', "FFC7CE"), ('"참고"',
     ck.conditional_formatting.add(f"D{C0}:D{C1}", CellIsRule(operator="equal", formula=[val], fill=PatternFill("solid", fgColor=fill)))
 widths(ck, [5, 28, 40, 10, 60])
 
+# 대시보드 결과 내장 (EMBED_JSON=data.js 경로): 엑셀만 올려도 HTML 대시보드가 읽도록 숨김 시트에 30,000자씩 저장
+if os.environ.get("EMBED_JSON") and os.path.exists(os.environ["EMBED_JSON"]):
+    _js = open(os.environ["EMBED_JSON"], encoding="utf-8").read()
+    _ws = wb.create_sheet("대시보드데이터")
+    _ch = [_js[i:i + 30000] for i in range(0, len(_js), 30000)]
+    _ws["A1"] = "TRACE_DATA"; _ws["B1"] = len(_ch); _ws["C1"] = "예시 데이터"
+    for _i, _c in enumerate(_ch): _ws.cell(row=2 + _i, column=1, value=_c).number_format = "@"
+    _ws.sheet_state = "hidden"
 order = ["안내", "설정", "헤더설정", "입력옵션", "자가진단", "대시보드", "IFRS17_사업비", "리포트", "주의대상", "원인분석", "변동분석", "계정변동", "월별집계", "차트데이터", "코멘트", "키워드사전",
-         "예산판_원본", "TB_원본", "전표_원본", "BS_원본", "PL_원본", "부채변동표", "예정사업비", "배분기준", "계정매핑", "부서매핑"]
+         "예산판_원본", "TB_원본", "전표_원본", "BS_원본", "PL_원본", "부채변동표", "예정사업비", "계정대체기준", "계정매핑", "부서매핑"]
+if "대시보드데이터" in wb.sheetnames: order.append("대시보드데이터")
 wb._sheets = [wb[n] for n in order]
 for w in wb.worksheets: w.sheet_view.showGridLines = False
 for n, colr in [("설정", "FFC000"), ("자가진단", "70AD47"), ("대시보드", "1F3864"), ("리포트", "1F3864"), ("BS_원본", "5B9BD5"), ("PL_원본", "5B9BD5"), ("부채변동표", "5B9BD5"), ("예정사업비", "5B9BD5"), ("IFRS17_사업비", "7030A0"), ("주의대상", "C00000"), ("원인분석", "C00000"),

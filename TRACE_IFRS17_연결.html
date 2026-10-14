@@ -1,125 +1,132 @@
-<title>TRACE GMM 연결도</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TRACE IFRS 17 연결</title>
 <style>
-/* 레이아웃: 왼쪽(전표)에서 오른쪽(손익·CSM)으로 흐르는 연결도 + 노드별 상세(설명 | TRACE 위치 | 예시). 아래에 모형별 처리, 입력 자료, 대사 포인트 */
+/* 레이아웃: 상단 메뉴 → 왼쪽(전표)에서 오른쪽(손익·CSM)으로 흐르는 연결도 + 노드 상세 → 탭(모형별 처리 · 입력 자료 · 대사 포인트) */
 :root {
   --bg: #f3f5f4; --surface: #ffffff; --ink: #16231f; --muted: #5b6b66; --line: #c9d3cf; --grid: #e6ebe8;
   --accent: #17705a; --accent-soft: #e1f0ea; --pl: #9a6512; --pl-soft: #fbf0dc; --csm: #2f5d9e; --csm-soft: #e3ebf7;
-  --off: #8a9792; --off-soft: #eef1f0;
-  --font-body: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
-  --font-mono: "IBM Plex Mono", Consolas, Menlo, ui-monospace, monospace;
+  --inv: #6b4fa0; --inv-soft: #ece6f6; --off: #8a9792; --off-soft: #eef1f0;
+  --font: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+  --mono: Consolas, "SFMono-Regular", Menlo, ui-monospace, monospace;
+  color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #33433d; --grid: #222d29;
     --accent: #4fbf9a; --accent-soft: #183128; --pl: #e0a84a; --pl-soft: #33281a; --csm: #82a9e8; --csm-soft: #1b2638;
-    --off: #6f7d78; --off-soft: #1d2522; color-scheme: dark;
+    --inv: #b49be0; --inv-soft: #2a2238; --off: #6f7d78; --off-soft: #1d2522; color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #33433d; --grid: #222d29;
   --accent: #4fbf9a; --accent-soft: #183128; --pl: #e0a84a; --pl-soft: #33281a; --csm: #82a9e8; --csm-soft: #1b2638;
-  --off: #6f7d78; --off-soft: #1d2522; color-scheme: dark;
+  --inv: #b49be0; --inv-soft: #2a2238; --off: #6f7d78; --off-soft: #1d2522; color-scheme: dark;
 }
 * { box-sizing: border-box; }
-body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.65; padding-inline: 16px; padding-block: 0; }
-.wrap { max-width: 1160px; margin: 0 auto; padding-block: 36px 64px; display: grid; gap: 44px; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.65; padding-inline: 16px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding-block: 28px 64px; display: grid; gap: 28px; }
 h1, h2, h3 { margin: 0; line-height: 1.3; text-wrap: balance; }
-h1 { font-size: clamp(25px, 3.6vw, 34px); }
-h2 { font-size: 20px; }
-h3 { font-size: 15.5px; }
+h1 { font-size: clamp(24px, 3.4vw, 32px); } h2 { font-size: 19px; } h3 { font-size: 15.5px; }
 p { margin: 0; }
-.eyebrow { font-size: 12px; letter-spacing: .08em; color: var(--accent); font-weight: 500; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
 .muted { color: var(--muted); }
-.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-section { display: grid; gap: 16px; }
-.head { display: grid; gap: 6px; max-width: 72ch; }
-header.top { display: grid; gap: 12px; }
-.lede { font-size: 16.5px; color: var(--muted); max-width: 66ch; }
-.lede b { color: var(--ink); font-weight: 500; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.topnav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 6; background: var(--ink); color: var(--bg); margin-inline: -16px; padding: 0 16px; }
+.topnav .in { max-width: 1240px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; min-height: 48px; }
+.topnav .brand { font-weight: 800; letter-spacing: .06em; font-size: 16px; color: var(--bg); text-decoration: none; }
+.topnav .brand small { font-weight: 500; letter-spacing: 0; opacity: .7; font-size: 12px; margin-left: 6px; }
+.topnav nav { display: flex; flex-wrap: wrap; gap: 2px; }
+.topnav nav a { color: var(--bg); opacity: .78; text-decoration: none; font-size: 13.5px; padding: 6px 10px; border-radius: 6px; }
+.topnav nav a:hover { opacity: 1; background: color-mix(in srgb, var(--bg) 14%, transparent); }
+.topnav nav a[aria-current="page"] { opacity: 1; font-weight: 700; background: color-mix(in srgb, var(--bg) 18%, transparent); }
+.lede { color: var(--muted); max-width: 72ch; }
+.lede b { color: var(--ink); }
 .keys { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; }
 .key { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 12px; }
 .key i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-
-/* 연결도 */
 .diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 6px; overflow-x: auto; }
-.diagram svg { display: block; min-width: 980px; width: 100%; height: auto; }
-.node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.3; transition: stroke .15s, fill .15s; }
-.node .t { font-family: var(--font-body); font-size: 14px; font-weight: 700; fill: var(--ink); }
-.node .s { font-family: var(--font-body); font-size: 11.5px; fill: var(--muted); }
+.diagram svg { display: block; min-width: 1080px; width: 100%; height: auto; }
+.node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.3; transition: stroke .15s; }
+.node .t { font-family: var(--font); font-size: 14px; font-weight: 700; fill: var(--ink); }
+.node .s { font-family: var(--font); font-size: 11.5px; fill: var(--muted); }
 .node { cursor: pointer; outline: none; }
 .node:hover rect { stroke: var(--accent); }
 .node:focus-visible rect { stroke: var(--accent); stroke-width: 2.5; }
-.node.k-pl rect { fill: var(--pl-soft); }
-.node.k-csm rect { fill: var(--csm-soft); }
-.node.k-off rect { fill: var(--off-soft); stroke-dasharray: 4 3; }
+.node.k-pl rect { fill: var(--pl-soft); } .node.k-csm rect { fill: var(--csm-soft); } .node.k-inv rect { fill: var(--inv-soft); }
 .node.on rect { stroke: var(--accent); stroke-width: 2.6; }
-.edge path { fill: none; stroke: var(--line); stroke-width: 1.8; transition: stroke .15s; }
+.edge path { fill: none; stroke: var(--line); stroke-width: 1.8; }
 .edge.dash path { stroke-dasharray: 5 4; }
-.edge text { font-family: var(--font-body); font-size: 11px; fill: var(--muted); }
+.edge text { font-family: var(--font); font-size: 11px; fill: var(--muted); }
 .edge.on path { stroke: var(--accent); stroke-width: 2.6; }
-.edge.on text { fill: var(--accent); font-weight: 500; }
-#arrow path { fill: var(--line); }
-#arrowOn path { fill: var(--accent); }
-
+.edge.on text { fill: var(--accent); font-weight: 700; }
+#arrow path { fill: var(--line); } #arrowOn path { fill: var(--accent); }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
 .panel > div { padding: 22px 24px; display: grid; gap: 12px; align-content: start; min-width: 0; }
 .panel .ex { border-left: 1px solid var(--line); background: color-mix(in srgb, var(--accent-soft) 40%, var(--surface)); border-radius: 0 12px 12px 0; }
 @media (max-width: 780px) { .panel { grid-template-columns: 1fr; } .panel .ex { border-left: none; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; } }
 .panel ul { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
-.where { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 13.5px; }
-.where dt { color: var(--muted); }
-.where dd { margin: 0; }
+.where { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 13.5px; margin: 0; }
+.where dt { color: var(--muted); } .where dd { margin: 0; }
 .nav { display: flex; justify-content: space-between; gap: 8px; }
-.nav button { font: inherit; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
-.nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.nav button:disabled { opacity: .4; cursor: default; }
-.nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.ex-label { font-size: 12px; color: var(--muted); }
-.ex-label b { color: var(--ink); font-weight: 500; }
+.btn2 { font: inherit; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.btn2:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); } .btn2:disabled { opacity: .4; cursor: default; }
+.btn2:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ex-label { font-size: 12px; color: var(--muted); } .ex-label b { color: var(--ink); }
 .calc { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .calc td { padding: 6px 4px; border-bottom: 1px solid var(--line); }
-.calc td.n { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.calc td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .calc tr:last-child td { border-bottom: none; }
-.tag { display: inline-block; font-size: 11.5px; font-weight: 500; border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
-.tag.pl { background: var(--pl-soft); color: var(--pl); }
-.tag.csm { background: var(--csm-soft); color: var(--csm); }
-.tag.off { background: var(--off-soft); color: var(--off); }
-.tag.ok { background: var(--accent-soft); color: var(--accent); }
-
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); }
+.tabs button { font: inherit; font-size: 14px; color: var(--muted); background: none; border: none; border-bottom: 3px solid transparent; padding: 8px 12px; cursor: pointer; margin-bottom: -1px; }
+.tabs button[aria-selected="true"] { color: var(--ink); font-weight: 700; border-bottom-color: var(--accent); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tag { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
+.tag.pl { background: var(--pl-soft); color: var(--pl); } .tag.csm { background: var(--csm-soft); color: var(--csm); } .tag.inv { background: var(--inv-soft); color: var(--inv); }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
 table.grid { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
 table.grid th, table.grid td { padding: 11px 16px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-table.grid thead th { font-size: 12px; color: var(--muted); font-weight: 500; }
+table.grid thead th { font-size: 12px; color: var(--muted); font-weight: 600; }
 table.grid tbody th { font-weight: 700; white-space: nowrap; }
 table.grid tr:last-child td, table.grid tr:last-child th { border-bottom: none; }
 .checks { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .checks li { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 4px; font-size: 14px; }
-.checks b { font-weight: 700; }
 @media (max-width: 700px) { .checks { grid-template-columns: 1fr; } }
 .note { background: var(--off-soft); border: 1px dashed var(--line); border-radius: 12px; padding: 14px 18px; font-size: 14px; display: grid; gap: 6px; }
 footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
-
+</head>
+<body>
+<header class="topnav"><div class="in">
+  <a class="brand" href="TRACE_대시보드.html">TRACE<small>사업비 원인추적기</small></a>
+  <nav aria-label="TRACE 페이지">
+    <a href="TRACE_대시보드.html">대시보드</a>
+    <a href="TRACE_흐름.html">처리 흐름</a>
+    <a href="TRACE_IFRS17_연결.html" aria-current="page">IFRS 17 연결</a>
+    <a href="TRACE_사용설명서.html">사용설명서</a>
+  </nav>
+</div></header>
 <div class="wrap">
-  <header class="top">
-    <span class="eyebrow">TRACE · IFRS 17 GMM 기준</span>
+  <header style="display:grid;gap:10px">
+    <span class="eyebrow">IFRS 17 · GMM · VFA · PAA</span>
     <h1>사업비 전표가 손익과 CSM에 닿는 길</h1>
-    <p class="lede">사업비 전표는 <b>귀속/비귀속 배분</b>을 거쳐 신계약비·유지비·수금비로 나뉘고, 포트폴리오별로 <b>계리 예정사업비</b>와 비교됩니다. 그 차이(경험차이)가 측정모형에 따라 <b>당기손익</b> 또는 <b>CSM</b>으로 갑니다. 노드를 누르면 처리 방법과 TRACE 위치, 예시 숫자가 나옵니다.</p>
-    <div class="keys" aria-label="범례">
-      <span class="key"><i style="background:var(--pl-soft);border:1px solid var(--pl)"></i>당기손익으로 가는 곳</span>
-      <span class="key"><i style="background:var(--csm-soft);border:1px solid var(--csm)"></i>CSM으로 가는 곳</span>
-      <span class="key"><i style="background:var(--off-soft);border:1px dashed var(--off)"></i>분석에서 빼는 곳</span>
+    <p class="lede">IFRS 4·9 기준으로 친 사업비 전표는 <b>계정대체</b>로 IFRS 17 계정이 됩니다. 특정 계정은 지정 계정으로 바로 가고, 공통비는 <b>투자관련부서의 유지비 성격분을 재산관리비로 먼저 넘긴 뒤</b> 쓴 부서의 비율대로 나뉩니다. 귀속 사업비는 포트폴리오별로 계리 예정사업비와 비교되고, 그 차이가 측정모형에 따라 <b>CSM</b> 또는 <b>당기손익</b>으로 갑니다. 노드를 누르면 처리 방법과 예시가 나옵니다.</p>
+    <div class="keys">
+      <span class="key"><i style="background:var(--pl-soft);border:1px solid var(--pl)"></i>당기손익</span>
+      <span class="key"><i style="background:var(--csm-soft);border:1px solid var(--csm)"></i>CSM</span>
+      <span class="key"><i style="background:var(--inv-soft);border:1px solid var(--inv)"></i>투자손익 (재산관리비)</span>
       <span class="key"><i style="border-top:2px dashed var(--muted);border-radius:0;height:0;width:16px"></i>전표가 직접 원인은 아닌 연결</span>
     </div>
   </header>
 
-  <section aria-labelledby="flow-h">
-    <div class="head"><span class="eyebrow">연결 흐름</span><h2 id="flow-h">전표 → 배분 → 포트폴리오 → 경험차이 → 손익 · CSM</h2></div>
-    <div class="diagram"><svg id="svg" viewBox="0 0 1120 540" role="group" aria-label="사업비 IFRS 17 연결도">
+  <section style="display:grid;gap:14px">
+    <div class="diagram"><svg viewBox="0 0 1230 650" role="group" aria-label="사업비 IFRS 17 연결도">
       <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
         <marker id="arrowOn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
@@ -131,56 +138,59 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
         <h3 id="p-t"></h3>
         <ul id="p-d"></ul>
         <dl class="where"><dt>TRACE</dt><dd id="p-w"></dd><dt>자료</dt><dd id="p-s"></dd></dl>
-        <div class="nav"><button type="button" id="prev">← 이전</button><button type="button" id="next">다음 →</button></div>
+        <div class="nav"><button type="button" class="btn2" id="prev">← 이전</button><button type="button" class="btn2" id="next">다음 →</button></div>
       </div>
       <div class="ex">
-        <p class="ex-label">예시 · <b>9월 GA 판매시책비 650</b>만 떼어서 따라가 보기 · 백만원 · 가상 수치</p>
+        <p class="ex-label">예시 · 백만원 · 가상 수치</p>
         <div id="p-e" style="display:grid;gap:10px"></div>
       </div>
     </div>
   </section>
 
-  <section aria-labelledby="model-h">
-    <div class="head"><span class="eyebrow">측정모형별 처리</span><h2 id="model-h">같은 사업비 차이도 모형에 따라 가는 곳이 다릅니다</h2>
-      <p class="muted">회사 회계정책과 계리 방법론에 따라 세부 처리가 다를 수 있으니, 실제 적용 전에 계리·회계팀과 확인하세요.</p></div>
-    <div class="card"><table class="grid">
-      <thead><tr><th>모형 (TRACE 포트폴리오)</th><th>신계약비 경험차이</th><th>유지·수금비 경험차이</th><th>사업비 가정변경</th><th>TRACE 처리</th></tr></thead>
-      <tbody>
-        <tr><th>GMM · 보장성, 저축성</th><td><span class="tag csm">CSM 조정</span> 미래 서비스 관련 → 상각으로 나눠 손익 반영</td><td><span class="tag pl">당기손익</span> 보험서비스결과</td><td><span class="tag csm">BEL·CSM</span> 미래 사업비 증가분만큼 BEL ↑ CSM ↓</td><td>분석 대상 (주력)</td></tr>
-        <tr><th>PAA · 단체(단기)</th><td><span class="tag pl">당기손익</span> CSM 없음</td><td><span class="tag pl">당기손익</span></td><td>해당 적음</td><td>일부 반영 (손익 영향만)</td></tr>
-        <tr><th>VFA · 변액</th><td colspan="3">특별계정 구분계리 대상. 사업비 배분액과 차이는 계산하되 일반계정 분석에서는 뺍니다</td><td><span class="tag off">참고 표시</span></td></tr>
-      </tbody></table></div>
-  </section>
-
-  <section aria-labelledby="data-h">
-    <div class="head"><span class="eyebrow">입력 자료</span><h2 id="data-h">어디서 받아 어디에 쓰는가</h2></div>
-    <div class="card"><table class="grid">
-      <thead><tr><th>자료</th><th>받는 곳</th><th>TRACE 시트</th><th>쓰임</th></tr></thead>
-      <tbody>
-        <tr><th>사업비 전표</th><td>SAP 전표조회</td><td>전표_원본</td><td>실제 사업비, 원인 전표, 거래처·적요 분석</td></tr>
-        <tr><th>배분 기준</th><td>관리회계 (사업비 배분)</td><td>배분기준</td><td>귀속/비귀속, 신계약·유지·수금 비율, 포트폴리오 드라이버</td></tr>
-        <tr><th>예정사업비</th><td>계리 (BEL 예상현금흐름의 사업비)</td><td>예정사업비</td><td>경험차이 = 예정 − 실제</td></tr>
-        <tr><th>보험계약부채 변동표</th><td>감독원 양식 · 계리</td><td>부채변동표</td><td>BEL·RA·CSM 요인별 변동, 경험조정-신계약비(F31)와 대사</td></tr>
-        <tr><th>BS · PL</th><td>감독원 양식</td><td>BS_원본 · PL_원본</td><td>CSM·BEL·RA 잔액, 기타사업비용, 손익 추이</td></tr>
-        <tr><th>TB · 예산판</th><td>SAP</td><td>TB_원본 · 예산판_원본</td><td>전표 완전성 대사, 예산 소진 판정</td></tr>
-      </tbody></table></div>
-  </section>
-
-  <section aria-labelledby="chk-h">
-    <div class="head"><span class="eyebrow">대사 포인트</span><h2 id="chk-h">연결이 맞는지 확인하는 네 군데</h2></div>
-    <ul class="checks">
-      <li><b>비귀속 합계 = PL 기타사업비용</b><span class="muted">배분 후 비귀속 사업비가 손익계산서 기타사업비용과 같은지</span></li>
-      <li><b>TRACE 신계약비 경험차이 ≈ 변동표 F31</b><span class="muted">포트폴리오별 추정치와 계리 결과(경험조정-신계약비 CSM) 비교</span></li>
-      <li><b>변동표 기말 = BS 잔액</b><span class="muted">포트폴리오 합계 BEL·RA·CSM이 재무상태표와 같은지</span></li>
-      <li><b>기초 + 요인 합계 = 기말</b><span class="muted">변동표 롤포워드가 포트폴리오·구성요소별로 맞는지</span></li>
-    </ul>
+  <section style="display:grid;gap:14px">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" data-t="model" aria-selected="true">측정모형별 처리</button>
+      <button type="button" role="tab" data-t="data" aria-selected="false">입력 자료</button>
+      <button type="button" role="tab" data-t="check" aria-selected="false">대사 포인트</button>
+    </div>
+    <div data-p="model" style="display:grid;gap:10px">
+      <p class="muted">회사 회계정책과 계리 방법론에 따라 세부 처리가 다를 수 있으니, 실제 적용 전에 계리·회계팀과 확인하세요.</p>
+      <div class="card"><table class="grid">
+        <thead><tr><th>모형 (TRACE 포트폴리오)</th><th>신계약비 경험차이</th><th>유지·수금비 경험차이</th><th>사업비 가정변경</th></tr></thead>
+        <tbody>
+          <tr><th>GMM · 보장성, 저축성</th><td><span class="tag csm">CSM 조정</span> 미래 서비스 관련 → 상각으로 나눠 손익 반영</td><td><span class="tag pl">당기손익</span> 보험서비스결과</td><td><span class="tag csm">BEL·CSM</span> 미래 사업비 증가분만큼 BEL ↑ CSM ↓</td></tr>
+          <tr><th>VFA · 변액 (특별계정)</th><td><span class="tag csm">CSM 조정</span> 미래 서비스 관련 → 상각으로 손익 반영</td><td><span class="tag pl">당기손익</span> 보험서비스결과</td><td><span class="tag csm">BEL·CSM</span></td></tr>
+          <tr><th>PAA · 단체(단기)</th><td><span class="tag pl">당기손익</span> CSM 없음</td><td><span class="tag pl">당기손익</span></td><td>해당 적음</td></tr>
+        </tbody></table></div>
+    </div>
+    <div data-p="data" hidden>
+      <div class="card"><table class="grid">
+        <thead><tr><th>자료</th><th>받는 곳</th><th>TRACE 시트</th><th>쓰임</th></tr></thead>
+        <tbody>
+          <tr><th>사업비 전표</th><td>SAP (IFRS 4·9 원장)</td><td>전표_원본</td><td>실제 사업비, 원인 전표</td></tr>
+          <tr><th>계정대체 기준</th><td>관리회계</td><td>계정매핑 · 계정대체기준</td><td>직접대체 계정, 공통비 성격, 투자관련부서·재산관리비 비율(연 1회), 부서별 대체비율</td></tr>
+          <tr><th>상품·포트폴리오 귀속</th><td>관리회계 · 계리</td><td>계정대체기준 3번 표</td><td>귀속 사업비 → 포트폴리오 (상품·증권번호별 결과를 받으면 대체)</td></tr>
+          <tr><th>예정사업비</th><td>계리</td><td>예정사업비</td><td>경험차이 = 예정 − 실제</td></tr>
+          <tr><th>보험계약부채 변동표</th><td>감독원 양식 · 계리</td><td>부채변동표</td><td>BEL·RA·CSM 요인별 변동, 경험조정-신계약비(F31) 대사</td></tr>
+          <tr><th>BS · PL</th><td>감독원 양식</td><td>BS_원본 · PL_원본</td><td>CSM 잔액, 기타사업비용, 재산관리비, 손익 추이</td></tr>
+        </tbody></table></div>
+    </div>
+    <div data-p="check" hidden>
+      <ul class="checks">
+        <li><b>계정대체 전후 합계</b><span class="muted">전표 사업비 = 비귀속 + 신계약 + 유지 + 수금 + 재산관리비</span></li>
+        <li><b>비귀속 합계 = PL 기타사업비용</b><span class="muted">대체 후 비귀속이 손익계산서 기타사업비용과 같은지</span></li>
+        <li><b>재산관리비 대체액 = PL 재산관리비</b><span class="muted">투자관련부서 유지비 공통비 × 연간 비율</span></li>
+        <li><b>TRACE 신계약비 경험차이 ≈ 변동표 F31</b><span class="muted">GMM·VFA 포트폴리오별 추정치와 계리 결과 비교</span></li>
+        <li><b>변동표 기말 = BS 잔액</b><span class="muted">포트폴리오 합계 BEL·RA·CSM이 재무상태표와 같은지</span></li>
+        <li><b>기초 + 요인 합계 = 기말</b><span class="muted">변동표 롤포워드</span></li>
+      </ul>
+    </div>
   </section>
 
   <div class="note">
     <b>사업비 전표와 관계없는 변동</b>
     <span>보험금융비용(이자부리, F40), RA 해제(F52), 할인율·금리 변동, 보험료·보험금 현금흐름(F60), 신계약 효과(F10)는 사업비 전표가 원인이 아닙니다. TRACE는 이 요인들을 CSM 브리지에 그대로 보여주되 원인 전표를 연결하지 않습니다.</span>
   </div>
-
   <footer>모든 숫자는 흐름을 설명하기 위한 가상 예시입니다. 변동요인 코드(F10~F99)는 TRACE 부채변동표의 예시 체계이며, 실제 감독원 양식 항목과는 입력옵션 시트에서 연결합니다.</footer>
 </div>
 
@@ -189,63 +199,67 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
   "use strict";
   var W = 156, H = 64;
   var N = {
-    je:     { x: 10,  y: 238, t: "사업비 전표", s: "계정 · 코스트센터 · 거래처" },
-    alloc:  { x: 192, y: 238, t: "귀속/비귀속 배분", s: "계정 직접귀속 → CC 비율" },
-    non:    { x: 374, y: 30,  t: "비귀속", s: "이행현금흐름 밖" },
-    acq:    { x: 374, y: 160, t: "신계약비", s: "보험취득현금흐름" },
-    mnt:    { x: 374, y: 280, t: "유지비", s: "보유계약 관리" },
-    col:    { x: 374, y: 400, t: "수금비", s: "보험료 수금" },
-    pf:     { x: 560, y: 280, t: "포트폴리오 배분", s: "건수·보유·보험료 비중" },
-    expd:   { x: 748, y: 140, t: "예정사업비", s: "계리 · BEL 현금흐름" },
-    diff:   { x: 748, y: 280, t: "경험차이", s: "예정 − 실제" },
-    assume: { x: 748, y: 440, t: "가정변경-사업비", s: "단위사업비 가정 (F21)", k: "csm" },
-    plo:    { x: 950, y: 30,  t: "기타사업비용", s: "PL · 당기손익", k: "pl" },
-    isr:    { x: 950, y: 160, t: "보험서비스결과", s: "PL · 당기손익", k: "pl" },
-    csm:    { x: 950, y: 290, t: "CSM 조정 (GMM)", s: "F31 → 상각 F51", k: "csm" },
-    sep:    { x: 950, y: 420, t: "구분계리 (VFA)", s: "변액 · 분석 제외", k: "off" }
+    je:     { x: 10,   y: 270, t: "사업비 전표", s: "IFRS 4·9 기준 원장" },
+    sub:    { x: 185,  y: 270, t: "계정대체", s: "IFRS 4·9 → IFRS 17" },
+    direct: { x: 360,  y: 100, t: "직접대체", s: "특정 계정 → 지정 계정" },
+    common: { x: 360,  y: 400, t: "공통비", s: "부서가 쓴 공통 경비" },
+    dept:   { x: 535,  y: 330, t: "부서별 비율 대체", s: "남은 공통비" },
+    inv:    { x: 535,  y: 560, t: "재산관리비 대체", s: "투자부서 유지비 × 연간 비율", k: "inv" },
+    non:    { x: 710,  y: 40,  t: "비귀속", s: "이행현금흐름 밖" },
+    cats:   { x: 710,  y: 200, t: "신계약 · 유지 · 수금", s: "귀속 사업비" },
+    pf:     { x: 885,  y: 200, t: "포트폴리오 경험차이", s: "예정 − 실제" },
+    expd:   { x: 885,  y: 330, t: "예정사업비", s: "계리 · BEL 현금흐름" },
+    assume: { x: 885,  y: 450, t: "가정변경-사업비", s: "단위사업비 가정 (F21)", k: "csm" },
+    plo:    { x: 1065, y: 40,  t: "기타사업비용", s: "PL · 당기손익", k: "pl" },
+    isr:    { x: 1065, y: 170, t: "보험서비스결과", s: "PL · 당기손익", k: "pl" },
+    csm:    { x: 1065, y: 300, t: "CSM 조정", s: "GMM · VFA (F31)", k: "csm" },
+    invpl:  { x: 1065, y: 560, t: "투자손익", s: "PL · 재산관리비", k: "inv" }
   };
-  var E = [["je", "alloc"], ["alloc", "non"], ["alloc", "acq"], ["alloc", "mnt"], ["alloc", "col"], ["non", "plo", "비귀속 전액"],
-           ["acq", "pf"], ["mnt", "pf"], ["col", "pf"], ["pf", "diff", "실제"], ["expd", "diff", "예정"],
-           ["diff", "isr", "유지·수금 / PAA"], ["diff", "csm", "GMM 신계약비"], ["diff", "sep", "VFA"],
-           ["pf", "assume", "실적 추세", 1], ["assume", "csm", "BEL↑ CSM↓", 1]];
+  var E = [["je", "sub"], ["sub", "direct", "특정 계정"], ["sub", "common", "그 외"], ["direct", "non", "광고선전비 등"], ["direct", "cats", "모집·수금 수수료"],
+           ["common", "dept", "남은 금액"], ["common", "inv", "투자부서 · 유지비"], ["dept", "cats"], ["dept", "non"], ["inv", "invpl", "재산관리비"],
+           ["non", "plo", "비귀속 전액"], ["cats", "pf", "실제"], ["expd", "pf", "예정", 0, "v"], ["pf", "isr", "유지·수금 / PAA"], ["pf", "csm", "GMM·VFA 신계약비"],
+           ["cats", "assume", "실적 추세", 1], ["assume", "csm", "BEL↑ CSM↓", 1]];
   var D = {
-    je: { t: "사업비 전표", d: ["사업비 계정의 전표 라인 전부를 SAP에서 한 번에 받습니다.", "계정, 코스트센터, 거래처, 적요가 이후 배분과 원인 분석에 모두 쓰입니다."], w: "전표_원본", s: "SAP 전표조회 (FAGLL03 · FBL3N · 자체 화면)",
-      e: '<table class="calc"><tr><td>전기일</td><td class="n">9/26</td></tr><tr><td>계정</td><td class="n">63501000 모집수수료</td></tr><tr><td>코스트센터</td><td class="n">1901 GA채널</td></tr><tr><td>거래처</td><td class="n">AA보험대리점</td></tr><tr><td>적요</td><td class="n">9월 신상품 GA 판매시책비</td></tr><tr><td><b>금액</b></td><td class="n"><b>650.0</b></td></tr></table>' },
-    alloc: { t: "귀속/비귀속 배분", d: ["계정 직접귀속 표에 있는 계정이면 그 비율을 먼저 씁니다 (예: 모집수수료 → 신계약 100%).", "없으면 코스트센터 비율을 씁니다 (예: 고객서비스 → 비귀속 10 / 유지 60 / 수금 30).", "배분표에 없는 코스트센터는 전액 비귀속으로 보고 자가진단이 알려줍니다."], w: "배분기준 시트 · 전표_원본 비귀속~수금비 열", s: "관리회계 사업비 배분 기준",
-      e: '<table class="calc"><tr><td>적용 규칙</td><td class="n">계정 직접귀속</td></tr><tr><td>비귀속</td><td class="n">0.0</td></tr><tr><td><b>신계약비</b></td><td class="n"><b>650.0</b></td></tr><tr><td>유지비 · 수금비</td><td class="n">0.0</td></tr></table>' },
-    non: { t: "비귀속 사업비", d: ["포트폴리오에 직접 귀속되지 않는 일반관리비입니다. 이행현금흐름(BEL)에 들어가지 않습니다.", "광고선전비, 본사 관리부서 비용 대부분이 여기에 해당합니다."], w: "IFRS17_사업비 · 배분 요약", s: "배분 기준",
-      e: '<p>시책비는 전액 귀속이라 비귀속은 <b class="mono">0</b>입니다.</p><p class="muted">다른 예: 마케팅전략 광고비는 100% 비귀속 → 바로 기타사업비용.</p>' },
-    plo: { t: "기타사업비용 (당기손익)", d: ["비귀속 사업비는 경험차이 없이 그대로 당기 비용입니다.", "TRACE는 배분 후 비귀속 합계가 PL 기타사업비용과 같은지 대사합니다."], w: "자가진단 · PL 기타사업비용 ↔ 비귀속 사업비", s: "PL (감독원 양식)",
-      e: '<p>시책비 영향 <b class="mono">0</b>. 비귀속이 늘면 이 줄이 늘고 당기순이익이 같은 금액만큼 줄어듭니다.</p>' },
-    acq: { t: "신계약비 (보험취득현금흐름)", d: ["모집수수료, 시책비, 신계약 관련 영업 비용입니다.", "GMM에서는 예정 대비 차이가 미래 서비스 관련 경험조정이 되어 CSM을 조정합니다."], w: "전표_원본 신계약비 열 · IFRS17_사업비", s: "배분 기준",
-      e: '<p>신계약비 실제 <b class="mono">+650.0</b> (시책비만 본 금액)</p>' },
-    mnt: { t: "유지비", d: ["보유계약 관리 비용입니다. 예정 대비 차이는 당기 보험서비스결과로 갑니다."], w: "전표_원본 유지비 열", s: "배분 기준",
-      e: '<p>시책비 영향 <b class="mono">0</b>. 예: 고객서비스팀 비용의 60%가 유지비.</p>' },
-    col: { t: "수금비", d: ["보험료 수금 관련 비용입니다. 예정 대비 차이는 당기 보험서비스결과로 갑니다."], w: "전표_원본 수금비 열", s: "배분 기준",
-      e: '<p>시책비 영향 <b class="mono">0</b>. 예: 유지수수료의 50%가 수금비.</p>' },
-    pf: { t: "포트폴리오 배분", d: ["귀속 사업비를 포트폴리오로 나눕니다. 신계약비는 신계약 건수, 유지비는 보유계약, 수금비는 수입보험료 비중을 씁니다.", "포트폴리오마다 측정모형(GMM·PAA·VFA)이 정해져 있어 이후 가는 곳이 갈립니다."], w: "배분기준 시트 · 포트폴리오 드라이버", s: "관리회계 · 계리",
-      e: '<table class="calc"><tr><td>보장성 (GMM) 55%</td><td class="n">357.5</td></tr><tr><td>저축성 (GMM) 20%</td><td class="n">130.0</td></tr><tr><td>단체 (PAA) 10%</td><td class="n">65.0</td></tr><tr><td>변액 (VFA) 15%</td><td class="n">97.5</td></tr></table>' },
-    expd: { t: "예정사업비", d: ["계리가 BEL 예상현금흐름에 넣은 사업비입니다. 포트폴리오 × 월 × 신계약·유지·수금으로 받습니다.", "실제와의 차이가 경험차이입니다."], w: "예정사업비 시트", s: "계리 (예정사업비 · 단위사업비 가정)",
-      e: '<p>계리 예정에는 이번 시책비가 <b>없습니다</b>. 예정은 평소 수준만 반영합니다.</p>' },
-    diff: { t: "경험차이 (예정 − 실제)", d: ["양수면 유리(실제가 예정보다 적음), 음수면 불리입니다.", "신계약비 차이와 유지·수금비 차이를 따로 계산해 가는 곳을 나눕니다."], w: "IFRS17_사업비 · 포트폴리오별 경험차이", s: "예정사업비 + 배분 결과",
-      e: '<table class="calc"><tr><td>보장성 GMM</td><td class="n">△357.5</td></tr><tr><td>저축성 GMM</td><td class="n">△130.0</td></tr><tr><td>단체 PAA</td><td class="n">△65.0</td></tr><tr><td>변액 VFA</td><td class="n">△97.5</td></tr><tr><td><b>합계</b></td><td class="n"><b>△650.0</b></td></tr></table>' },
-    isr: { t: "보험서비스결과 (당기손익)", d: ["유지·수금비 경험차이는 당기 서비스 관련이라 바로 손익입니다.", "PAA는 CSM이 없어서 신계약비 차이도 여기로 갑니다."], w: "IFRS17_사업비 · 반영처 '당기손익'", s: "PL 보험서비스비용",
+    je: { t: "사업비 전표 (IFRS 4·9)", d: ["회계 전표는 IFRS 4·9 기준 원장 계정으로 칩니다.", "계정, 부서(코스트센터), 거래처, 적요가 이후 계정대체와 원인 분석에 쓰입니다."], w: "전표_원본", s: "SAP 전표조회",
+      e: '<table class="calc"><tr><td>시책비</td><td class="n">모집수수료 · GA채널 · 650.0</td></tr><tr><td>정보이용료</td><td class="n">지급수수료 · 자산운용팀 · 30.0</td></tr><tr><td>회의비</td><td class="n">회의비 · 고객서비스팀 · 4.0</td></tr></table>' },
+    sub: { t: "계정대체 (IFRS 4·9 → IFRS 17)", d: ["계정매핑 시트의 'IFRS17 대체구분'이 직접이면 지정 계정으로, 공통비면 공통비 규칙으로 보냅니다.", "전표 한 건마다 비귀속·신계약·유지·수금·재산관리비 금액이 계산되고, 합계는 항상 전표 금액과 같습니다."], w: "전표_원본 비귀속~재산관리비 열 · 계정매핑", s: "관리회계 계정대체 기준",
+      e: '<p>세 전표가 각각 다른 길로 갑니다. 다음 단계에서 하나씩 따라갑니다.</p>' },
+    direct: { t: "직접대체", d: ["특정 계정은 IFRS 17 특정 계정으로 바로 갑니다. 비율 계산이 없습니다.", "예: 모집수수료 → 신계약비, 유지수수료 → 수금비, 광고선전비 → 비귀속."], w: "계정매핑 · 직접대체 IFRS17 계정 열", s: "관리회계",
+      e: '<table class="calc"><tr><td>시책비 650.0 (모집수수료)</td><td class="n">신계약비 650.0</td></tr></table>' },
+    common: { t: "공통비", d: ["직접대체가 아닌 계정은 공통비입니다.", "계정매핑의 '공통비 성격'이 유지비이고 쓴 부서가 투자관련부서면, 먼저 재산관리비로 일부를 넘깁니다."], w: "계정매핑 · 공통비 성격 열", s: "관리회계",
+      e: '<table class="calc"><tr><td>정보이용료 30.0</td><td class="n">유지비 성격 · 자산운용팀(투자부서)</td></tr><tr><td>회의비 4.0</td><td class="n">유지비 성격 · 고객서비스팀</td></tr></table>' },
+    inv: { t: "재산관리비 대체", d: ["투자관련부서가 쓴 유지비 성격 공통비에 연간 비율을 곱해 재산관리비로 넘깁니다.", "비율은 1년에 한 번 바뀌며, 전표의 회계연도에 맞는 비율을 씁니다."], w: "계정대체기준 1번 표", s: "관리회계 (연 1회 결정)",
+      e: '<table class="calc"><tr><td>정보이용료 30.0 × 70%</td><td class="n">재산관리비 21.0</td></tr><tr><td>남은 금액</td><td class="n">9.0 → 부서별 비율</td></tr></table>' },
+    invpl: { t: "투자손익 (재산관리비)", d: ["재산관리비는 IFRS 17 이행현금흐름에 들어가지 않고 PL 투자손익에서 차감됩니다.", "TRACE는 재산관리비 대체액이 PL 재산관리비와 같은지 대사합니다."], w: "IFRS17_사업비 1번 표 · 자가진단", s: "PL (감독원 양식)",
+      e: '<p>재산관리비 <b class="mono">21.0</b> → 투자손익 감소</p>' },
+    dept: { t: "부서별 비율 대체", d: ["재산관리비로 넘기고 남은 공통비를 쓴 부서의 비율로 신계약비·유지비·수금비·비귀속에 나눕니다.", "비율표에 없는 부서는 전액 비귀속으로 처리하고 자가진단이 알려줍니다."], w: "계정대체기준 2번 표", s: "관리회계",
+      e: '<table class="calc"><tr><td>자산운용팀 9.0</td><td class="n">유지 30% 2.7 · 비귀속 70% 6.3</td></tr><tr><td>고객서비스팀 회의비 4.0</td><td class="n">유지 60% · 수금 30% · 비귀속 10%</td></tr></table>' },
+    non: { t: "비귀속", d: ["포트폴리오에 귀속되지 않는 사업비로, 이행현금흐름(BEL)에 들어가지 않습니다.", "비귀속 합계는 PL 기타사업비용과 같아야 합니다."], w: "전표_원본 비귀속 열", s: "계정대체 결과",
+      e: '<p>자산운용팀 6.3 + 고객서비스팀 0.4 = <b class="mono">6.7</b> → 기타사업비용</p>' },
+    plo: { t: "기타사업비용 (당기손익)", d: ["비귀속 사업비는 경험차이 없이 그대로 당기 비용입니다."], w: "자가진단 · PL 기타사업비용 ↔ 비귀속", s: "PL (감독원 양식)",
+      e: '<p>비귀속 6.7 → 당기 비용</p>' },
+    cats: { t: "신계약 · 유지 · 수금 (귀속 사업비)", d: ["직접대체와 부서별 비율 대체에서 나온 귀속 사업비입니다.", "신계약비는 보험취득현금흐름, 유지·수금비는 보유계약 관련 현금흐름입니다."], w: "전표_원본 신계약비·유지비·수금비 열", s: "계정대체 결과",
+      e: '<table class="calc"><tr><td>신계약비</td><td class="n">650.0 (시책비)</td></tr><tr><td>유지비</td><td class="n">2.7 + 2.4</td></tr><tr><td>수금비</td><td class="n">1.2</td></tr></table>' },
+    pf: { t: "포트폴리오 경험차이 (예정 − 실제)", d: ["귀속 사업비를 포트폴리오로 나누고(신계약 건수·보유계약·보험료 비중) 계리 예정사업비와 비교합니다.", "상품·증권번호별 귀속 결과를 받으면 그 결과로 바꿀 수 있습니다."], w: "IFRS17_사업비 2번 표", s: "예정사업비 + 계정대체 결과",
+      e: '<table class="calc"><tr><td>보장성 GMM 55%</td><td class="n">△357.5</td></tr><tr><td>저축성 GMM 20%</td><td class="n">△130.0</td></tr><tr><td>단체 PAA 10%</td><td class="n">△65.0</td></tr><tr><td>변액 VFA 15%</td><td class="n">△97.5</td></tr></table><p class="muted">시책비 650만 떼어 본 신계약비 경험차이 (예정에는 없음)</p>' },
+    expd: { t: "예정사업비 (계리)", d: ["계리가 BEL 예상현금흐름에 넣은 사업비입니다. 포트폴리오 × 월 × 신계약·유지·수금으로 받습니다."], w: "예정사업비 시트", s: "계리",
+      e: '<p>계리 예정에는 이번 시책비가 <b>없습니다</b>.</p>' },
+    isr: { t: "보험서비스결과 (당기손익)", d: ["유지·수금비 경험차이는 당기 서비스 관련이라 바로 손익입니다 (GMM·VFA·PAA 모두).", "PAA는 CSM이 없어서 신계약비 차이도 여기로 갑니다."], w: "IFRS17_사업비 · 반영처 '당기손익'", s: "PL 보험서비스비용",
       e: '<p>단체(PAA) 신계약비 차이 <b class="mono">△65.0</b> → 당기 보험서비스결과 감소</p>' },
-    csm: { t: "CSM 조정 (GMM)", d: ["GMM 신계약비 차이는 미래 서비스 관련 경험조정으로 CSM을 조정합니다 (변동표 F31).", "조정된 CSM은 남은 보장기간에 걸쳐 상각(F51)되며 미래 손익에 나눠 반영됩니다.", "TRACE 추정치와 계리 변동표 F31을 포트폴리오별로 대사합니다."], w: "IFRS17_사업비 · CSM 브리지 · 변동표 대사", s: "부채변동표 (감독원 양식 · 계리)",
-      e: '<table class="calc"><tr><td>보장성</td><td class="n">△357.5</td></tr><tr><td>저축성</td><td class="n">△130.0</td></tr><tr><td><b>GMM CSM 조정</b></td><td class="n"><b>△487.5</b></td></tr></table><p class="muted">근거 전표: AA보험대리점 9/26 판매시책비 650.0</p>' },
-    sep: { t: "구분계리 (VFA · 변액)", d: ["변액은 특별계정으로 구분계리 중이라 일반계정 분석에서 뺍니다.", "배분액과 차이는 계산해서 참고로 보여줍니다."], w: "IFRS17_사업비 · 반영처 '구분계리'", s: "특별계정 결산",
-      e: '<p>변액 몫 <b class="mono">△97.5</b>는 <span class="tag off">참고</span>로만 표시</p>' },
-    assume: { t: "가정변경-사업비 (F21)", d: ["실적이 계속 예정보다 높으면 계리가 단위사업비 가정을 올립니다.", "미래 사업비가 늘어난 만큼 BEL이 늘고 같은 금액만큼 CSM이 줄어듭니다.", "전표는 가정변경의 근거일 뿐 직접 원인은 아니어서 점선으로 연결합니다."], w: "IFRS17_사업비 · CSM 브리지 '가정변경-사업비'", s: "계리 가정 · 부채변동표",
-      e: '<p>예시 계리 결과: 9월 보장성 단위사업비 가정 상향 → BEL <b class="mono">+1,200</b>, CSM <b class="mono">△1,200</b></p><p class="muted">TRACE는 "최근 실적 추세가 예정보다 높았다"는 근거를 함께 보여줍니다.</p>' }
+    csm: { t: "CSM 조정 (GMM · VFA)", d: ["GMM과 VFA의 신계약비 차이는 미래 서비스 관련 경험조정으로 CSM을 조정합니다 (변동표 F31).", "조정된 CSM은 남은 보장기간에 걸쳐 상각(F51)되며 미래 손익에 나눠 반영됩니다.", "TRACE 추정치와 계리 변동표 F31을 포트폴리오별로 대사합니다."], w: "IFRS17_사업비 · GMM/VFA 브리지 · 변동표 대사", s: "부채변동표 (감독원 양식 · 계리)",
+      e: '<table class="calc"><tr><td>GMM (보장성 + 저축성)</td><td class="n">△487.5</td></tr><tr><td>VFA (변액)</td><td class="n">△97.5</td></tr></table><p class="muted">근거 전표: AA보험대리점 9/26 판매시책비 650.0</p>' },
+    assume: { t: "가정변경-사업비 (F21)", d: ["실적이 계속 예정보다 높으면 계리가 단위사업비 가정을 올립니다.", "미래 사업비가 늘어난 만큼 BEL이 늘고 같은 금액만큼 CSM이 줄어듭니다.", "전표는 가정변경의 근거일 뿐 직접 원인은 아니어서 점선으로 연결합니다."], w: "IFRS17_사업비 · 브리지 '가정변경-사업비'", s: "계리 가정 · 부채변동표",
+      e: '<p>예시: 9월 보장성 단위사업비 가정 상향 → BEL <b class="mono">+1,200</b>, CSM <b class="mono">△1,200</b></p>' }
   };
-  var ORDER = ["je", "alloc", "non", "plo", "acq", "mnt", "col", "pf", "expd", "diff", "isr", "csm", "sep", "assume"];
+  var ORDER = ["je", "sub", "direct", "common", "inv", "invpl", "dept", "non", "plo", "cats", "pf", "expd", "isr", "csm", "assume"];
   var NS = "http://www.w3.org/2000/svg", eg = document.getElementById("edges"), ng = document.getElementById("nodes");
   function mk(tag, attrs, parent) { var el = document.createElementNS(NS, tag); for (var k in attrs) el.setAttribute(k, attrs[k]); parent.appendChild(el); return el; }
   var edgeEls = E.map(function (e) {
-    var a = N[e[0]], b = N[e[1]], x1 = a.x + W, y1 = a.y + H / 2, x2 = b.x - 4, y2 = b.y + H / 2, mx = (x1 + x2) / 2;
-    var g = mk("g", { "class": "edge" + (e[3] ? " dash" : "") }, eg);
-    mk("path", { d: "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2, "marker-end": "url(#arrow)" }, g);
-    if (e[2]) { var t = mk("text", { x: mx, y: (y1 + y2) / 2 - 6, "text-anchor": "middle" }, g); t.textContent = e[2]; }
+    var a = N[e[0]], b = N[e[1]], g = mk("g", { "class": "edge" + (e[3] ? " dash" : "") }, eg), d, lx, ly;
+    if (e[4] === "v") { var x = a.x + W / 2; d = "M" + x + "," + a.y + " L" + x + "," + (b.y + H + 4); lx = x + 22; ly = (a.y + b.y + H) / 2 + 4; }
+    else { var x1 = a.x + W, y1 = a.y + H / 2, x2 = b.x - 4, y2 = b.y + H / 2, mx = (x1 + x2) / 2; d = "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2; lx = mx; ly = (y1 + y2) / 2 - 6; }
+    mk("path", { d: d, "marker-end": "url(#arrow)" }, g);
+    if (e[2]) { var t = mk("text", { x: lx, y: ly, "text-anchor": "middle" }, g); t.textContent = e[2]; }
     return { g: g, a: e[0], b: e[1] };
   });
   var nodeEls = {};
@@ -262,23 +276,25 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
   function show(id) {
     cur = id;
     Object.keys(nodeEls).forEach(function (k) { nodeEls[k].classList.toggle("on", k === id); });
-    edgeEls.forEach(function (e) {
-      var on = e.a === id || e.b === id;
-      e.g.classList.toggle("on", on);
-      e.g.querySelector("path").setAttribute("marker-end", on ? "url(#arrowOn)" : "url(#arrow)");
-    });
+    edgeEls.forEach(function (e) { var on = e.a === id || e.b === id; e.g.classList.toggle("on", on); e.g.querySelector("path").setAttribute("marker-end", on ? "url(#arrowOn)" : "url(#arrow)"); });
     var d = D[id];
     document.getElementById("p-t").textContent = d.t;
     document.getElementById("p-d").innerHTML = d.d.map(function (x) { return "<li>" + x + "</li>"; }).join("");
-    document.getElementById("p-w").textContent = d.w;
-    document.getElementById("p-s").textContent = d.s;
+    document.getElementById("p-w").textContent = d.w; document.getElementById("p-s").textContent = d.s;
     document.getElementById("p-e").innerHTML = d.e;
     var i = ORDER.indexOf(id);
-    document.getElementById("prev").disabled = i <= 0;
-    document.getElementById("next").disabled = i >= ORDER.length - 1;
+    document.getElementById("prev").disabled = i <= 0; document.getElementById("next").disabled = i >= ORDER.length - 1;
   }
   document.getElementById("prev").addEventListener("click", function () { var i = ORDER.indexOf(cur); if (i > 0) show(ORDER[i - 1]); });
   document.getElementById("next").addEventListener("click", function () { var i = ORDER.indexOf(cur); if (i < ORDER.length - 1) show(ORDER[i + 1]); });
   show("je");
+  document.querySelectorAll(".tabs button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll(".tabs button").forEach(function (x) { x.setAttribute("aria-selected", x === b ? "true" : "false"); });
+      document.querySelectorAll("[data-p]").forEach(function (p) { p.hidden = p.getAttribute("data-p") !== b.getAttribute("data-t"); });
+    });
+  });
 })();
 </script>
+</body>
+</html>
