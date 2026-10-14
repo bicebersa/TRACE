@@ -30,6 +30,7 @@ EMBED_JSON=data.js python src/build_trace.py    # 결과 내장본으로 다시 
 python src/build_vba.py                         # modTrace.bas
 python src/build_xlsm.py                        # TRACE_v0.5.xlsm (매크로 내장, vbaProject.bin 직접 생성 · olevba로 구조 확인)
 python src/build_sample_fss.py                  # samples/샘플_감독원양식_2026-09.xlsx
+# 두 번째 예시: SEED=27 SCALE=1.35 COMPANY=샘플생명㈜ 로 src 사본에서 build_trace → build_datajs → EMBED 빌드 → samples/TRACE_예시2_샘플생명_v0.5.xlsx(.xlsm)
 python src/build_forms.py                       # samples/TRACE_입력양식_v0.5.xlsx (본체 헤더설정에서 생성)
 python src/build_bundle.py                      # TRACE_v0.5_전체.zip (내려받기 페이지용 전체 묶음)
 ```

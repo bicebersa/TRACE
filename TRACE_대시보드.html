@@ -500,7 +500,9 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   function parseDataText(t) {
     var i = t.indexOf("{"), j = t.lastIndexOf("}");
     if (i < 0 || j < i) throw new Error("JSON 형식이 아닙니다");
-    return JSON.parse(t.slice(i, j + 1));
+    t = t.slice(i, j + 1);
+    try { return JSON.parse(t); }
+    catch (e) { return JSON.parse(t.replace(/([:\[,]\s*-?)\.(\d)/g, "$10.$2")); }   // 이전 매크로가 0.5를 .5로 쓴 파일도 읽음
   }
   function loadFile(f) {
     setStatus("불러오는 중: " + f.name);

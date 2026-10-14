@@ -9,3 +9,4 @@ tools/_out/
 *.xlsm
 dl/
 !TRACE_v0.5.xlsm
+!samples/TRACE_예시2_샘플생명_v0.5.xlsm

@@ -173,7 +173,9 @@ Private Function JV(ByVal v As Variant) As String
     If IsError(v) Or IsEmpty(v) Then JV = "null": Exit Function
     Select Case VarType(v)
         Case vbDouble, vbSingle, vbInteger, vbLong, vbCurrency, vbDecimal
-            JV = Trim$(Str$(v))
+            JV = Trim$(Str$(v))                                 ' Str$은 0.5를 ".5"로 씀 → JSON은 앞자리 0 필요
+            If Left$(JV, 1) = "." Then JV = "0" & JV
+            If Left$(JV, 2) = "-." Then JV = "-0" & Mid$(JV, 2)
         Case vbDate
             JV = """" & Format(v, "yyyy-mm-dd") & """"
         Case vbBoolean

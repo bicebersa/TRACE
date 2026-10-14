@@ -286,7 +286,7 @@ summary17 = (f"GMM CSM 당월 변동 {sg(csm_chg, 0)} 중 사업비 관련 {sg(c
 ifrs17 = dict(summary=summary17, alloc=alloc, pf=pfrows, totals=dict(csm=tcsm, csmVfa=tvfa, pl=tpl), recon=recon, bridge=bridge, bridgeVfa=bridgeV,
               csmChange=csm_chg, csmExpense=csm_exp, csmChangeVfa=vcsm_chg, csmExpenseVfa=vcsm_exp, drivers=[{k: v for k, v in d.items() if k != "sk"} for d in drivers], evidence=evidence17)
 
-data = dict(meta=dict(company="예시보험㈜", period=plab(P), unit="백만원", check="전체 정상 (참고 1건)", recon="전체 일치", generated="2026-10-14 (예시 데이터)"),
+data = dict(meta=dict(company=os.environ.get("COMPANY", "예시보험㈜"), period=plab(P), unit="백만원", check="전체 정상 (참고 1건)", recon="전체 일치", generated="2026-10-14 (예시 데이터)"),
             kpi=kpi, monthly=monthly, depts=depts, status=status, accounts=accounts, bs=bsrows, pl=plrows, burn=burnrows, top10=top10, ifrs17=ifrs17)
 def rnd(o):
     if isinstance(o, float): return round(o, 4)

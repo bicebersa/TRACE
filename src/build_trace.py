@@ -57,7 +57,7 @@ def sec(ws, r, text):
     ws.cell(row=r, column=1, value=text).font = F(bold=True, size=11)
 
 # =================================================================== 예시 데이터
-rng = random.Random(11)
+rng = random.Random(int(os.environ.get("SEED", 11)))   # SEED를 바꾸면 숫자가 다른 예시 (패턴 시나리오는 같음)
 Y, M = 2026, 9
 PNOW = Y * 12 + M
 MONTHS = [(2025, m) for m in range(1, 13)] + [(2026, m) for m in range(1, M + 1)]
@@ -144,7 +144,7 @@ for (d, gl), bm in bud_gl.items():
     for y, m in MONTHS:
         spread(y, m, d, gl, bm[m - 1] * (g if y == 2025 else f) * rng.uniform(0.88, 1.12))
 
-MIL = 1_000_000
+MIL = round(1_000_000 * float(os.environ.get("SCALE", 1)))   # SCALE: 예시 금액 배율 (다른 예시를 만들 때)
 # S1 마케팅팀 광고선전비: 9월 단건 대형(TV캠페인) + 신규 거래처
 s1_25 = [150, 140, 160, 150, 140, 150, 160, 150, 180, 190, 200, 201.4]
 s1_26 = [190, 190, 190, 140, 130, 140, 190, 120]
@@ -336,7 +336,7 @@ widths(ws, [18, 60, 62])
 st = wb.create_sheet("설정")
 title(st, "설정", "노란 칸만 바꾸세요")
 header(st, 4, ["항목", "값", "설명"], start=2, h=20)
-SROWS = [(5, "회사명", "예시보험㈜", None, ""), (6, "기준연도", Y, "0", ""), (7, "기준월", M, "0", "1~12"),
+SROWS = [(5, "회사명", os.environ.get("COMPANY", "예시보험㈜"), None, ""), (6, "기준연도", Y, "0", ""), (7, "기준월", M, "0", "1~12"),
          (8, "원본 금액단위", "원", None, "예산판·TB·전표 공통"), (9, "보고 단위", "백만원", None, "모든 분석 표시 단위"),
          (10, "증감 기준금액 (보고단위)", 10, NUM0, "이 금액 미만의 작은 증감은 주의 점수를 30%로 낮춤 · 증가액 점수 만점 = 5배"),
          (11, "예산 '주의' 기준 (예상 소진율)", 0.9, PCT, "예상 연간 실적 ÷ 가용예산이 이 값 초과면 주의"),
