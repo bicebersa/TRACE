@@ -1,5 +1,17 @@
 {
   "functions": {
-    "api/chat.js": { "includeFiles": "{README.md,docs/*.md}" }
-  }
+    "api/chat.js": {
+      "includeFiles": "{README.md,docs/*.md}"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/TRACE_대시보드.html"
+    },
+    {
+      "source": "/chat",
+      "destination": "/index.html"
+    }
+  ]
 }
