@@ -3,58 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="trace.css">
 <title>TRACE 처리 흐름</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
 <style>
-/* 레이아웃: 위에서 아래로 읽는 설명서. 핵심은 7단계 파이프라인 + 단계별 상세(일반 로직 | 예시) 패널 */
-:root {
-  --bg: #f3f5f4;
-  --surface: #ffffff;
-  --ink: #16231f;
-  --muted: #5b6b66;
-  --line: #d5ddd9;
-  --accent: #17705a;
-  --accent-soft: #e1f0ea;
-  --warn: #9a6512;
-  --warn-soft: #fbf0dc;
-  --crit: #b4372f;
-  --crit-soft: #f8e2df;
-  --font-body: "IBM Plex Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  --radius: 10px;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #2a3833;
-    --accent: #4fbf9a; --accent-soft: #183128; --warn: #e0a84a; --warn-soft: #33281a;
-    --crit: #ef7a6e; --crit-soft: #3a1f1c; color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #2a3833;
-  --accent: #4fbf9a; --accent-soft: #183128; --warn: #e0a84a; --warn-soft: #33281a;
-  --crit: #ef7a6e; --crit-soft: #3a1f1c; color-scheme: dark;
-}
-* { box-sizing: border-box; }
-body {
-  background: var(--bg); color: var(--ink);
-  font-family: var(--font-body); font-size: 15px; line-height: 1.65;
-  padding-inline: 16px; padding-block: 0;
-}
 .wrap { max-width: 1120px; margin: 0 auto; padding-block: 40px 72px; display: grid; gap: 56px; }
-h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.3; }
-h1 { font-size: clamp(26px, 4vw, 36px); font-weight: 700; letter-spacing: -0.01em; }
-h2 { font-size: 21px; font-weight: 700; }
-h3 { font-size: 16px; font-weight: 700; }
-p { margin: 0; }
-.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-.eyebrow { font-size: 12px; letter-spacing: 0.08em; color: var(--accent); font-weight: 500; text-transform: uppercase; }
-.muted { color: var(--muted); }
 section { display: grid; gap: 18px; }
 .section-head { display: grid; gap: 6px; max-width: 70ch; }
-
 /* 머리 */
 header.top { display: grid; gap: 14px; }
 header.top .lede { font-size: 17px; max-width: 62ch; color: var(--muted); }
@@ -74,7 +32,6 @@ header.top .lede strong { color: var(--ink); font-weight: 500; }
 .acro { font-family: var(--font-mono); font-size: 13px; color: var(--muted); letter-spacing: .02em; }
 .acro b { color: var(--accent); font-weight: 500; font-size: 15px; }
 .note { font-size: 12px; color: var(--muted); }
-
 /* 파이프라인 */
 .pipe-scroll { overflow-x: auto; padding-bottom: 4px; }
 .pipe {
@@ -117,7 +74,6 @@ header.top .lede strong { color: var(--ink); font-weight: 500; }
   .loop { min-width: 0; grid-template-columns: 1fr; }
   .loop span { grid-column: 1; border-radius: 10px; border-top: 1px dashed var(--line); }
 }
-
 /* 상세 패널 */
 .panel {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
@@ -145,14 +101,12 @@ header.top .lede strong { color: var(--ink); font-weight: 500; }
 .nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ex-label { font-size: 12px; color: var(--muted); }
 .ex-label b { color: var(--ink); font-weight: 500; }
-
 /* 예시 안의 요소 */
 .kv { width: 100%; border-collapse: collapse; font-size: 13.5px; }
 .kv th, .kv td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
 .kv th { font-weight: 500; color: var(--muted); font-size: 12px; }
 .kv td.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .kv tr:last-child td { border-bottom: none; }
-.tbl-scroll { overflow-x: auto; }
 .pill { display: inline-block; font-size: 12px; font-weight: 500; border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
 .pill.ok { background: var(--accent-soft); color: var(--accent); }
 .pill.warn { background: var(--warn-soft); color: var(--warn); }
@@ -170,20 +124,11 @@ header.top .lede strong { color: var(--ink); font-weight: 500; }
 .split .row { display: grid; grid-template-columns: minmax(0, 1fr) 56px; gap: 10px; align-items: center; font-size: 13px; }
 .split .row .lbl { display: grid; gap: 3px; min-width: 0; }
 .split .row .pct { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-
-/* 매트릭스 · 표 */
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 0; }
-table.grid { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px; }
-table.grid th, table.grid td { padding: 11px 16px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-table.grid thead th { font-size: 12px; color: var(--muted); font-weight: 500; letter-spacing: .02em; }
-table.grid tbody th { font-weight: 500; white-space: nowrap; }
-table.grid tr:last-child td, table.grid tr:last-child th { border-bottom: none; }
 .src { display: inline-block; font-size: 12.5px; border-radius: 6px; padding: 1px 8px; margin: 1px 4px 1px 0; border: 1px solid var(--line); white-space: nowrap; }
 .src.bp { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
 .src.tb { border-style: dashed; }
 .src.je { background: var(--accent-soft); border-color: transparent; }
 .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--muted); }
-
 /* 망분리 레인 */
 .lanes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .lane { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; display: grid; gap: 12px; align-content: start; }
@@ -194,7 +139,6 @@ table.grid tr:last-child td, table.grid tr:last-child th { border-bottom: none; 
 .handoff { font-size: 13px; color: var(--muted); display: grid; gap: 4px; }
 .handoff b { color: var(--ink); font-weight: 500; }
 @media (max-width: 760px) { .lanes { grid-template-columns: 1fr; } }
-
 /* 로드맵 */
 .road { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
 .step { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 8px; align-content: start; }
@@ -204,28 +148,14 @@ table.grid tr:last-child td, table.grid tr:last-child th { border-bottom: none; 
 .step ul { margin: 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 4px; }
 @media (max-width: 900px) { .road { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 520px) { .road { grid-template-columns: 1fr; } }
-
 .checklist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; margin: 0; padding: 0; list-style: none; }
 .checklist li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; font-size: 14px; }
 .checklist li::before { content: ""; width: 14px; height: 14px; border: 1.5px solid var(--accent); border-radius: 3px; margin-top: 5px; }
 .checklist b { font-weight: 500; }
 @media (max-width: 640px) { .checklist { grid-template-columns: 1fr; } }
 
-footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
-<style>
-.topnav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 6; background: var(--ink); color: var(--bg); margin-inline: -16px; padding: 0 16px; }
-.topnav .in { max-width: 1240px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; min-height: 48px; }
-.topnav .brand { font-weight: 800; letter-spacing: .06em; font-size: 16px; color: var(--bg); text-decoration: none; }
-.topnav .brand small { font-weight: 500; letter-spacing: 0; opacity: .7; font-size: 12px; margin-left: 6px; }
-.topnav nav { display: flex; flex-wrap: wrap; gap: 2px; }
-.topnav nav a { color: var(--bg); opacity: .78; text-decoration: none; font-size: 13.5px; padding: 6px 10px; border-radius: 6px; }
-.topnav nav a:hover { opacity: 1; background: color-mix(in srgb, var(--bg) 14%, transparent); }
-.topnav nav a[aria-current="page"] { opacity: 1; font-weight: 700; background: color-mix(in srgb, var(--bg) 18%, transparent); }
-[hidden] { display: none !important; }
-html, body { margin: 0; }
-</style>
+
 </head>
 <body>
 <header class="topnav"><div class="in">

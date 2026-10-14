@@ -18,7 +18,7 @@ TRACE(사업비 원인추적기)는 보험사 예산·사업비 담당자가 내
 - `src/build_vba.py`: `modTrace.bas` 생성 (시트 레이아웃 상수를 `tool_data.json`에서 읽어 넣음).
 - `src/build_sample_fss.py`: 예시 감독원 양식(가로형) 생성.
 - `tools/verify.py`: 작은 범위로 엑셀을 만들어 `formulas` 라이브러리로 전 수식을 계산하고, 파이썬 대조값과 비교한다.
-- HTML 5개(대시보드·처리 흐름·IFRS 17 연결·사용설명서·내려받기)는 공통 상단 메뉴로 연결된다. 내려받기 페이지는 claude.ai에서는 `downloads` 기능(아티팩트 capabilities)으로, 로컬에서는 `a[download]`로 받는다. 아티팩트에는 xlsx·zip도 함께 게시한다. 대시보드는 탭 5개, `data.js` 또는 엑셀 업로드로 자료를 읽는다.
+- HTML 5개(대시보드·처리 흐름·IFRS 17 연결·사용설명서·내려받기)는 공통 상단 메뉴로 연결되고, 공통 디자인(색 토큰·메뉴·카드·표·탭)은 `trace.css` 한 파일에 있다. 페이지 `<style>`에는 그 페이지 전용 규칙만 둔다. 외부 글꼴 없이 맑은 고딕·D2Coding/Consolas. 내려받기 페이지는 claude.ai에서는 `downloads` 기능(아티팩트 capabilities)으로, 로컬에서는 `a[download]`로 받는다. 아티팩트는 xlsx·zip을 파일로 못 올리므로 `build_bundle.py`가 만든 `dl/*.js`(base64)를 함께 게시한다. 대시보드는 탭 5개, `data.js` 또는 엑셀 업로드로 자료를 읽는다.
 - `legacy/`: 초기 산출물(SAP 시산표·자산운용 양식, 예산실적리포트 v0.1)과 생성 스크립트.
 
 ## 빌드 순서
@@ -32,6 +32,11 @@ python src/build_sample_fss.py                  # samples/샘플_감독원양식
 python src/build_forms.py                       # samples/TRACE_입력양식_v0.5.xlsx (본체 헤더설정에서 생성)
 python src/build_bundle.py                      # TRACE_v0.5_전체.zip (내려받기 페이지용 전체 묶음)
 ```
+
+## 예산 고갈 예상 (선형 추세)
+- 변동분석 AP~AW열: 월 소진속도(기울기)·절편·추세 연말 누계·고갈 예상(개월)·고갈 예상일·추세 판정·분기 고갈 예상일·정렬키. 월별집계 AB~AM열(당해 누계 1~12월, 기준월 이후 0)을 쓴다.
+- 직선은 점 (0,0)…(기준월, 누계)에 최소제곱. Excel 2016 호환을 위해 SLOPE 대신 SUMPRODUCT 닫힌 식. 날짜는 `YEAR/MONTH/DAY`로 문자열 조립 (TEXT 날짜 서식은 지역 설정에 따라 다름).
+- 차트데이터 96행부터 소진 추세 표(전사 1행 + 고갈 빠른 순 15행) → VBA `burn` 배열 → 대시보드 사업비 탭 카드.
 
 ## 검증 방법
 - 이 개발 환경에는 엑셀·LibreOffice가 없을 수 있다. `python tools/verify.py`로 수식을 계산·대조한다 (전표 범위를 줄인 사본으로 10분 안팎, 메모리 8GB면 **한 번에 하나씩** 실행).

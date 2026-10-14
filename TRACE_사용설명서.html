@@ -3,63 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="trace.css">
 <title>TRACE 사용설명서</title>
 <style>
-/* 레이아웃: 상단 메뉴 → 제목 → 탭 6개 (한 번에 한 주제). 본문 폭 약 72자, 표는 가로 스크롤 */
-:root {
-  --bg: #f3f5f4; --surface: #ffffff; --ink: #16231f; --muted: #5b6b66; --line: #d5ddd9; --grid: #e6ebe8;
-  --accent: #17705a; --accent-soft: #e1f0ea; --warn: #9a6512; --warn-soft: #fbf0dc; --crit: #b4372f; --crit-soft: #f8e2df;
-  --font: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
-  --mono: Consolas, "SFMono-Regular", Menlo, ui-monospace, monospace;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #2a3833; --grid: #222d29;
-    --accent: #4fbf9a; --accent-soft: #183128; --warn: #e0a84a; --warn-soft: #33281a; --crit: #ef7a6e; --crit-soft: #3a1f1c; color-scheme: dark; }
-}
-:root[data-theme="dark"] { --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #2a3833; --grid: #222d29;
-  --accent: #4fbf9a; --accent-soft: #183128; --warn: #e0a84a; --warn-soft: #33281a; --crit: #ef7a6e; --crit-soft: #3a1f1c; color-scheme: dark; }
-* { box-sizing: border-box; }
-[hidden] { display: none !important; }
-html, body { margin: 0; }
-body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.7; padding-inline: 16px; }
+.card { padding: 18px 20px; display: grid; gap: 10px; }
 .wrap { max-width: 1040px; margin: 0 auto; padding-block: 28px 64px; display: grid; gap: 22px; }
-h1, h2, h3 { margin: 0; line-height: 1.3; text-wrap: balance; }
-h1 { font-size: clamp(24px, 3.4vw, 32px); } h2 { font-size: 20px; } h3 { font-size: 16px; }
-p { margin: 0; max-width: 76ch; }
-code, .mono { font-family: var(--mono); font-size: .92em; background: var(--grid); border-radius: 4px; padding: 0 4px; }
-.eyebrow { font-size: 12px; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
-.muted { color: var(--muted); }
-.topnav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 6; background: var(--ink); color: var(--bg); margin-inline: -16px; padding: 0 16px; }
-.topnav .in { max-width: 1240px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; min-height: 48px; }
-.topnav .brand { font-weight: 800; letter-spacing: .06em; font-size: 16px; color: var(--bg); text-decoration: none; }
-.topnav .brand small { font-weight: 500; letter-spacing: 0; opacity: .7; font-size: 12px; margin-left: 6px; }
-.topnav nav { display: flex; flex-wrap: wrap; gap: 2px; }
-.topnav nav a { color: var(--bg); opacity: .78; text-decoration: none; font-size: 13.5px; padding: 6px 10px; border-radius: 6px; }
-.topnav nav a:hover { opacity: 1; background: color-mix(in srgb, var(--bg) 14%, transparent); }
-.topnav nav a[aria-current="page"] { opacity: 1; font-weight: 700; background: color-mix(in srgb, var(--bg) 18%, transparent); }
-.tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--line); position: sticky; top: calc(48px + env(safe-area-inset-top, 0px)); background: var(--bg); z-index: 4; }
-.tabs button { font: inherit; font-size: 14px; color: var(--muted); background: none; border: none; border-bottom: 3px solid transparent; padding: 9px 12px; cursor: pointer; margin-bottom: -1px; }
-.tabs button:hover { color: var(--ink); }
-.tabs button[aria-selected="true"] { color: var(--ink); font-weight: 700; border-bottom-color: var(--accent); }
-.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 section { display: grid; gap: 18px; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; display: grid; gap: 10px; min-width: 0; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
 ol, ul { margin: 0; padding-left: 22px; display: grid; gap: 6px; }
-.tbl { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 620px; }
-th, td { padding: 9px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-thead th { font-size: 12px; color: var(--muted); font-weight: 600; }
-tbody th { font-weight: 700; white-space: nowrap; }
-tr:last-child td, tr:last-child th { border-bottom: none; }
 .flow { font-family: var(--mono); font-size: 13px; line-height: 1.6; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; overflow-x: auto; white-space: pre; margin: 0; }
-.tip { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 14px; }
-.warn { border-left: 3px solid var(--warn); background: var(--warn-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 14px; }
 .chip { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 1px 9px; background: var(--accent-soft); color: var(--accent); }
 .c-blue { color: #0000ff; font-weight: 700; } .c-green { color: #008000; font-weight: 700; }
-footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
+
 </style>
 </head>
 <body>
@@ -124,7 +81,7 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
         <tr><th>대시보드 내보내기</th><td>TOP 10 원인분석을 한 건씩 계산해 <code>data.js</code>로 저장하고, 같은 내용을 숨김 시트 <code>대시보드데이터</code>에도 저장합니다.</td></tr>
         <tr><th>리포트 PDF</th><td>리포트 시트를 PDF로 저장합니다.</td></tr>
       </tbody></table></div>
-    <p class="tip">파일 구성: <code>TRACE_v0.5.xlsx</code>(본체) · <code>modTrace.bas</code>(매크로) · <code>TRACE_대시보드.html</code> + <code>data.js</code> · <code>TRACE_흐름.html</code> · <code>TRACE_IFRS17_연결.html</code> · <code>TRACE_사용설명서.html</code> · <code>samples/</code>(입력 양식 · 예시 감독원 양식). 모두 <a href="TRACE_내려받기.html">내려받기</a> 페이지에서 받을 수 있습니다.</p>
+    <p class="tip">파일 구성: <code>TRACE_v0.5.xlsx</code>(본체) · <code>modTrace.bas</code>(매크로) · <code>TRACE_대시보드.html</code> + <code>data.js</code> · <code>TRACE_흐름.html</code> · <code>TRACE_IFRS17_연결.html</code> · <code>TRACE_사용설명서.html</code> · <code>trace.css</code>(공통 디자인) · <code>samples/</code>(입력 양식 · 예시 감독원 양식). 모두 <a href="TRACE_내려받기.html">내려받기</a> 페이지에서 받을 수 있습니다.</p>
   </section>
 
   <!-- 엑셀 구성 -->
@@ -163,6 +120,12 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
         <ul><li>분기 한도 = 그 분기 배정 + 조정</li><li>분기말 예상 = 분기 실적 + 최근 3개월 평균 × 분기에 남은 개월</li>
         <li>이미 넘음 <span class="chip">한도 초과</span> · 예상 100% 초과 <span class="chip">초과 예상</span> · 90% 초과 <span class="chip">주의</span></li>
         <li>연간 전망(배정 합계 대비 예상 연간 실적)은 참고로 함께 계산합니다.</li></ul></div>
+      <div class="card"><h3>예산 고갈 예상 (선형 추세)</h3>
+        <p>월별로 모니터링할 때 연간 예산이 <b>언제 바닥나는지</b> 봅니다. 변동분석 AP~AW열, 차트데이터 소진 추세 표.</p>
+        <ul><li>점 (0, 0), (1월, 1월 누계) … (기준월, 누계실적)에 최소제곱 직선 <code>누계 = 절편 + 기울기 × 월</code>을 맞춥니다. 기울기가 월 소진속도입니다.</li>
+        <li>고갈 예상 시점 = (연간가용 − 절편) ÷ 기울기 (개월). 연초부터 그만큼 지난 날을 고갈 예상일로 표시합니다.</li>
+        <li><span class="chip">이미 소진</span> 누계가 이미 가용 이상 · <span class="chip">연내 고갈</span> 12월 안 · <span class="chip">연내 여유</span> 12월 뒤 · <span class="chip">소진 안 됨</span> 기울기 0 이하</li>
+        <li>분기 고갈 예상일 = 분기 한도 ÷ (분기 실적 ÷ 경과 개월). 분기 안에 닿지 않으면 '분기 내 여유'.</li></ul></div>
       <div class="card"><h3>주의 점수 (100점)</h3>
         <ul><li>증가액 30: 기준금액의 5배 이상이면 만점</li><li>증가율 20: 전월·전년동월 대비 100% 이상이면 만점</li>
         <li>이상치 25: 직전 12개월 평균 대비 3 표준편차면 만점</li><li>예산 25: 한도 초과·초과 예상·무예산 25, 주의 15</li>
@@ -192,7 +155,7 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
     </div>
     <div class="card"><h2>탭 구성</h2>
       <ul><li><b>요약:</b> KPI, 먼저 볼 부서·계정, 분기 한도 판정 분포, IFRS 17 요약</li>
-      <li><b>사업비:</b> 월별 사업비(당해·전년·분기 한도÷3), 부서별 분기 한도 소진, 계정별 당월 vs 전년동월, 판정 분포</li>
+      <li><b>사업비:</b> 월별 사업비(당해·전년·분기 한도÷3), 부서별 분기 한도 소진, 계정별 당월 vs 전년동월, 판정 분포, <b>예산 고갈 예상</b>(누계 실적·추세선·연간가용 차트, 고갈이 빠른 순 목록)</li>
       <li><b>주의 대상 · 원인:</b> TOP 10 표, 행을 누르면 원인 후보·거래처 분해·근거 전표·확인된 원인</li>
       <li><b>IFRS 17:</b> GMM·VFA CSM 변동 요인(전환 버튼), 포트폴리오별 경험차이, 배분 구성, 기여 부서·계정, 근거 전표, 변동표 대사</li>
       <li><b>재무 요약:</b> 자산·부채, 자본·CSM 추이, 월별 당기순이익, 손익 구성</li></ul>

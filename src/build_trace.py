@@ -470,6 +470,29 @@ for r in range(5, BP_FILL + 1):
         if j in (3, 4): c.number_format = NUM
 bp.freeze_panes = "A5"; widths(bp, [8, 9, 12, 11, 20, 6, 14, 12, 14, 14, 2, 15, 6, 5, 11, 11, 8, 10])
 
+# ---- 소진 추세 (선형). 점 (0,0), (1,누계1월) … (M,누계M월)에 최소제곱 직선 C(t)=α+βt → 연간가용에 닿는 t* = (가용−α)/β
+def datestr(x):  # 날짜 일련번호 → "2026-11-17" (TEXT 날짜 서식은 지역 설정에 따라 달라 직접 조립)
+    return f'YEAR({x})&"-"&TEXT(MONTH({x}),"00")&"-"&TEXT(DAY({x}),"00")'
+def burn_formulas(r, blank, cum, avail, ytd, cB, cA, cT, cS):
+    """cum: 누계 1~12월 범위(기준월 이후는 0), avail: 연간가용, ytd: 누계실적. 반환 {열번호: (수식, 색, 서식)} (42~47열)"""
+    m = S["mon"]; St = f"({m}*({m}+1)/2)"; Stt = f"({m}*({m}+1)*(2*{m}+1)/6)"
+    SC = f"SUM({cum})"; StC = f"SUMPRODUCT(월별집계!$AB$5:$AM$5,{cum})"
+    t = f"{cT}{r}"; st = f"{cS}{r}"; d = f'(DATE({S["yr"]},1,1)+ROUND({t}*365/12,0)-1)'
+    return {
+        42: (f'={blank},(({m}+1)*{StC}-{St}*{SC})/(({m}+1)*{Stt}-{St}^2))', GREEN, NUM),
+        43: (f'={blank},({SC}-{cB}{r}*{St})/({m}+1))', GREEN, NUM),
+        44: (f'={blank},{cA}{r}+{cB}{r}*12)', BLACK, NUM),
+        45: (f'={blank},IF(OR({avail}<=0,{ytd}>={avail},{cB}{r}<=0),"",MAX({m},({avail}-{cA}{r})/{cB}{r})))', BLACK, "0.0"),
+        46: (f'={blank},IF({t}="",IF({st}="이미 소진","소진됨",""),{datestr(d)}))', BLACK, None),
+        47: (f'={blank},IF(AND({avail}<=0,{ytd}>0),"무예산",IF({avail}<=0,"-",IF({ytd}>={avail},"이미 소진",IF({cB}{r}<=0,"소진 안 됨",IF({t}<=12,"연내 고갈","연내 여유"))))))', GREEN, None),
+    }
+def qdepl(lim, act):  # 분기: 분기 시작부터 경과 개월의 평균 속도(직선)로 분기 한도에 닿는 날
+    e = f'({S["P"]}-{S["qs"]}+1)'
+    tq = f"MAX({e},{lim}/({act}/{e}))"
+    d0 = f'DATE({S["yr"]},{S["qs"]}-{S["yr"]}*12,1)'
+    return (f'IF({lim}<=0,"",IF({act}>={lim},"한도 소진",IF({act}<=0,"",IF({lim}/({act}/{e})>3,"분기 내 여유",'
+            + datestr(f"({d0}+ROUND({tq}*365/12,0)-1)") + '))))')
+
 # =================================================================== 변동분석
 va = wb.create_sheet("변동분석")
 title(va, "변동분석 (부서 × 계정)", "A·C열만 입력 · 전월/전분기/전년동월 비교 → 예산 점검 → 주의 점수 · 금액: 보고단위")
@@ -482,6 +505,9 @@ header(va, 6, cols, h=44)
 header(va, 6, ["정렬키", "단건비중", "SA순증", "음수건수", "증가액\n(30)", "증가율\n(20)", "이상치\n(25)", "예산\n(25)"], start=28, fill=GRAYH, h=44)
 header(va, 6, ["분기 한도\n(배정+조정)", "분기 실적", "분기 잔여", "분기말\n예상", "분기\n소진율", "분기 판정"], start=36, h=44)
 va.cell(row=5, column=36, value="④-2 분기 한도 점검 (예산 통제 단위: 부서 × 계정 × 분기)").font = F(bold=True)
+header(va, 6, ["월 소진속도\n(기울기)", "절편", "추세\n연말 누계", "고갈\n예상(개월)", "고갈\n예상일", "추세 판정", "분기 고갈\n예상일"], start=42, h=44)
+header(va, 6, ["고갈\n정렬키"], start=49, fill=GRAYH, h=44)
+va.cell(row=5, column=42, value="④-3 소진 추세 (선형: 연초 0부터 월별 누계실적에 직선을 맞춰 연간가용에 닿는 시점)").font = F(bold=True)
 for c, t_ in [(6, "③ 변동"), (16, "④ 예산 점검"), (26, "⑤ 주의")]:
     va.cell(row=5, column=c, value=t_).font = F(bold=True)
 VA_PRE = 7 + len(KEYS) + 40
@@ -537,10 +563,15 @@ for idx in range(VA_PRE - 7):
         40: (f'={blank},IF(AJ{r}=0,0,AM{r}/AJ{r}))', BLACK, PCT),
         41: (f'={blank},IF(AND(AJ{r}=0,AK{r}>0),"무예산",IF(AJ{r}=0,"-",IF(AK{r}>AJ{r},"한도 초과",IF(AN{r}>{S["short"]},"초과 예상",IF(AN{r}>{S["warn"]},"주의","여유"))))))', GREEN, None),
     }
+    fm.update(burn_formulas(r, blank, f"월별집계!$AB{r}:$AM{r}", f"P{r}", f"Q{r}", "AP", "AQ", "AS", "AU"))
+    fm[48] = (f'={blank},{qdepl(f"AJ{r}", f"AK{r}")})', GREEN, None)
+    fm[49] = (f'=IF($A{r}="",999+ROW()/1000000,IF(AU{r}="이미 소진",ROW()/1000000,IF(AU{r}="연내 고갈",AS{r}+ROW()/1000000,99+ROW()/1000000)))', BLACK, "0.000")
     for c, (f_, col, fmt) in fm.items():
-        put(va, r, c, f_, col, fmt, align="center" if c in (5, 23, 25, 41) else None)
-va.freeze_panes = "F7"; va.auto_filter.ref = f"A6:AO{VA_PRE-1}"
-widths(va, [8, 12, 10, 18, 8] + [9] * 10 + [11, 10, 10, 10, 10, 10, 8, 10, 9, 9, 20, 7] + [8] * 8 + [11, 10, 10, 10, 8, 10])
+        put(va, r, c, f_, col, fmt, align="center" if c in (5, 23, 25, 41, 46, 47, 48) else None)
+va.freeze_panes = "F7"; va.auto_filter.ref = f"A6:AW{VA_PRE-1}"
+widths(va, [8, 12, 10, 18, 8] + [9] * 10 + [11, 10, 10, 10, 10, 10, 8, 10, 9, 9, 20, 7] + [8] * 8 + [11, 10, 10, 10, 8, 10] + [10, 9, 10, 8, 11, 10, 12, 8])
+for val, fill in (('"이미 소진"', "F8CBAD"), ('"연내 고갈"', "FCE4D6"), ('"무예산"', "D9C3E9")):
+    va.conditional_formatting.add(f"AU7:AU{VA_END}", CellIsRule(operator="equal", formula=[val], fill=PatternFill("solid", fgColor=fill)))
 for val, fill in (('"한도 초과"', "F8CBAD"), ('"초과 예상"', "FCE4D6"), ('"주의"', "FFE699"), ('"무예산"', "D9C3E9")):
     va.conditional_formatting.add(f"AO7:AO{VA_END}", CellIsRule(operator="equal", formula=[val], fill=PatternFill("solid", fgColor=fill)))
 va.column_dimensions["E"].hidden = True
@@ -568,7 +599,17 @@ for idx in range(VA_PRE - 7):
     for k in range(24):
         col = CL(3 + k)
         put(mz, r, 3 + k, f'=IF($A{r}="","",SUMIFS({JR("P")},{JR("O")},$A{r},{JR("M")},{col}$5))', GREEN, NUM)
-mz.freeze_panes = "C7"; widths(mz, [14, 26] + [8.5] * 24)
+# 보조: 기준연도 누계 1~12월 (기준월 이후는 0) → 변동분석 AP~AU 소진 추세 회귀에 사용
+put(mz, 4, 28, "당해 누계 (소진 추세용 · 기준월 이후 0)", bold=True)
+for k in range(1, 13):
+    c = 27 + k
+    put(mz, 5, c, k, GRAY, "0", align="center", fill=SUB)
+    put(mz, 6, c, f"=SUM({CL(c)}7:{CL(c)}{VA_END})", fmt=NUM, bold=True, fill=TOT)
+for idx in range(VA_PRE - 7):
+    r = 7 + idx
+    for k in range(1, 13):
+        put(mz, r, 27 + k, f'=IF(OR($A{r}="",{k}>{S["mon"]}),0,SUMIFS($C{r}:$Z{r},$C$5:$Z$5,">="&({S["yr"]}*12+1),$C$5:$Z$5,"<="&({S["yr"]}*12+{k})))', BLACK, NUM)
+mz.freeze_panes = "C7"; widths(mz, [14, 26] + [8.5] * 24 + [2] + [8.5] * 12)
 
 # =================================================================== 계정변동 (TB 기준)
 av = wb.create_sheet("계정변동")
@@ -1226,8 +1267,31 @@ for k, (lab, a, b, basis) in enumerate(KPI):
     r = CDG + 1 + k
     put(cd, r, 1, lab, bold=True); put(cd, r, 2, "=" + a, GREEN, NUM0 if k < 6 else "0"); put(cd, r, 3, "=" + b, GREEN, NUM0 if k < 6 else "0")
     put(cd, r, 4, "" if k == 6 else f"=IF(C{r}<=0,0,B{r}/C{r}-1)", fmt=RATE); put(cd, r, 5, basis, GRAY)
-widths(cd, [12, 14, 14, 14, 14, 14, 14])
-CD_LAYOUT = dict(CDA=CDA, CDB=CDB, CDC=CDC, CDD=CDD, CDE=CDE, CDF=CDF, CDG=CDG, NDEPT=len(DL), NGL=len(sgl), NKPI=len(KPI))
+CDH = 96  # 소진 추세: 1행 전사 + 고갈이 빠른 부서×계정 15개 (변동분석 AW열 정렬키 순)
+NBURN = 15
+header(cd, CDH, ["고갈 순위", "부서", "계정", "연간가용", "누계실적", "월 소진속도", "절편", "추세\n연말 누계", "고갈\n예상(개월)", "고갈\n예상일", "추세 판정", "분기 고갈\n예상일"]
+       + [f"누계\n{k}월" for k in range(1, 13)], h=30)
+header(cd, CDH, ["변동분석\n행", "분기 한도", "분기 실적"], start=25, fill=SUB, h=30)
+r = CDH + 1
+put(cd, r, 1, "전사", bold=True, align="center"); put(cd, r, 2, "전사", bold=True); put(cd, r, 3, "사업비 합계", bold=True)
+put(cd, r, 4, f'=SUM({VR("P")})', GREEN, NUM); put(cd, r, 5, f'=SUM({VR("Q")})', GREEN, NUM)
+put(cd, r, 26, f'=SUM({VR("AJ")})', GREEN, NUM); put(cd, r, 27, f'=SUM({VR("AK")})', GREEN, NUM)
+for k in range(12):
+    put(cd, r, 13 + k, f"=월별집계!{CL(28 + k)}6", GREEN, NUM)
+for c, (f_, col, fmt) in burn_formulas(r, f'IF($A{r}="",""', f"$M{r}:$X{r}", f"D{r}", f"E{r}", "F", "G", "I", "K").items():
+    put(cd, r, c - 36, f_, col, fmt, align="center" if c in (46, 47) else None)
+put(cd, r, 12, f"={qdepl(f'Z{r}', f'AA{r}')}", GREEN, align="center")
+for k in range(1, NBURN + 1):
+    r = CDH + 1 + k
+    put(cd, r, 25, f'=IFERROR(IF(SMALL({VR("AW")},{k})>=99,"",MATCH(SMALL({VR("AW")},{k}),{VR("AW")},0)),"")', GRAY, "0")
+    put(cd, r, 1, f'=IF($Y{r}="","",{k})', align="center")
+    for c, src, fmt in ((2, "B", None), (3, "D", None), (4, "P", NUM), (5, "Q", NUM), (6, "AP", NUM), (7, "AQ", NUM), (8, "AR", NUM), (9, "AS", "0.0"),
+                        (10, "AT", None), (11, "AU", None), (12, "AV", None), (26, "AJ", NUM), (27, "AK", NUM)):
+        put(cd, r, c, f'=IF($Y{r}="","",INDEX({VR(src)},$Y{r}))', GREEN, fmt, align="center" if c in (10, 11, 12) else None)
+    for j in range(12):
+        put(cd, r, 13 + j, f'=IF($Y{r}="","",INDEX(월별집계!${CL(28 + j)}$7:${CL(28 + j)}${VA_END},$Y{r}))', GREEN, NUM)
+widths(cd, [12, 14, 14, 14, 14, 14, 14, 11, 9, 11, 10, 12] + [8] * 12 + [8, 10, 10])
+CD_LAYOUT = dict(CDA=CDA, CDB=CDB, CDC=CDC, CDD=CDD, CDE=CDE, CDF=CDF, CDG=CDG, CDH=CDH, NBURN=NBURN, NDEPT=len(DL), NGL=len(sgl), NKPI=len(KPI))
 
 # ---------------- 대시보드 (엑셀)
 db = wb.create_sheet("대시보드")

@@ -55,6 +55,8 @@ Public Sub ExportDashboard()
     js = js & """accounts"": " & RowsJson("차트데이터", 38, 18, Array("gl", "name", "cur", "prevYear", "diff")) & "," & vbLf
     js = js & """bs"": " & RowsJson("차트데이터", 57, 12, Array("p", "period", "assets", "liabilities", "equity", "csm", "invested")) & "," & vbLf
     js = js & """pl"": " & RowsJson("차트데이터", 72, 12, Array("month", "niCur", "niPrev", "insCur", "invCur", "expCur", "insPrev")) & "," & vbLf
+    js = js & """burn"": " & RowsJson("차트데이터", 97, 16, Array("rank", "dept", "account", "budget", "ytd", "slope", "icpt", "yearEnd", "tstar", "date", "status", "qdate", _
+        "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12")) & "," & vbLf
     js = js & """ifrs17"": " & Ifrs17Json() & "," & vbLf
 
     ' TOP 10과 각 항목의 원인분석 (원인분석 시트 선택값을 바꿔가며 계산 후 원래대로 복원)

@@ -63,6 +63,23 @@ def main():
             if not isinstance(v, float) or abs(v - x[f]) > 0.06: bad.append(f"변동분석 {k} {col}: {v} vs {x[f]}")
         for col, f in (("W", "W"), ("AO", "AO")):
             if g("변동분석", f"{col}{r}") != x[f]: bad.append(f"변동분석 {k} {col}: {g('변동분석', f'{col}{r}')} vs {x[f]}")
+        for col, f in (("AP", "slope"), ("AQ", "icpt"), ("AS", "tstar")):   # 소진 추세 (선형)
+            v = g("변동분석", f"{col}{r}")
+            if x[f] == "":
+                if v not in ("", None): bad.append(f"변동분석 {k} {col}: {v} vs ''")
+            elif not isinstance(v, float) or abs(v - x[f]) > 0.06: bad.append(f"변동분석 {k} {col}: {v} vs {x[f]}")
+        for col, f in (("AT", "date"), ("AU", "status"), ("AV", "qdate")):
+            v = g("변동분석", f"{col}{r}")
+            if (v or "") != x[f]: bad.append(f"변동분석 {k} {col}: {v} vs {x[f]}")
+    CDL = json.load(open(os.path.join(SRC, "tool_data.json")))["CD"]
+    for i, b in enumerate(G["burnrows"]):
+        r = CDL["CDH"] + 1 + i
+        for col, f in (("A", "rank"), ("B", "dept"), ("J", "date"), ("K", "status"), ("L", "qdate")):
+            v = g("차트데이터", f"{col}{r}"); v = int(v) if isinstance(v, float) and f == "rank" else v
+            if v != b[f]: bad.append(f"차트데이터 소진 {i} {col}: {v} vs {b[f]}")
+        for col, f in (("D", "budget"), ("E", "ytd"), ("F", "slope"), ("G", "icpt"), ("X", "c12"), ("M", "c1")):
+            v = g("차트데이터", f"{col}{r}")
+            if not isinstance(v, float) or abs(v - b[f]) > 0.06: bad.append(f"차트데이터 소진 {i} {col}: {v} vs {b[f]}")
     top_xl = [g("주의대상", f"L{r}") for r in range(6, 16)]
     top_py = [f"{VA[k]['d']}|{VA[k]['gl']}" for k in G["rank"]]
     if top_xl != top_py: bad.append(f"TOP10 {top_xl} vs {top_py}")

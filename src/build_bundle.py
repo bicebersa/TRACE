@@ -6,7 +6,7 @@ import os, zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FILES = ["TRACE_v0.5.xlsx", "modTrace.bas", "TRACE_대시보드.html", "data.js", "TRACE_흐름.html", "TRACE_IFRS17_연결.html",
-         "TRACE_사용설명서.html", "TRACE_내려받기.html", "samples/TRACE_입력양식_v0.5.xlsx", "samples/샘플_감독원양식_2026-09.xlsx"]
+         "TRACE_사용설명서.html", "TRACE_내려받기.html", "trace.css", "samples/TRACE_입력양식_v0.5.xlsx", "samples/샘플_감독원양식_2026-09.xlsx"]
 OUT = os.path.join(ROOT, "TRACE_v0.5_전체.zip")
 
 with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as z:

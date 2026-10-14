@@ -61,6 +61,8 @@ Public Sub ExportDashboard()
     js = js & """accounts"": " & RowsJson("차트데이터", {CDD1}, {NGL}, Array("gl", "name", "cur", "prevYear", "diff")) & "," & vbLf
     js = js & """bs"": " & RowsJson("차트데이터", {CDE1}, 12, Array("p", "period", "assets", "liabilities", "equity", "csm", "invested")) & "," & vbLf
     js = js & """pl"": " & RowsJson("차트데이터", {CDF1}, 12, Array("month", "niCur", "niPrev", "insCur", "invCur", "expCur", "insPrev")) & "," & vbLf
+    js = js & """burn"": " & RowsJson("차트데이터", {CDH1}, {NBURN1}, Array("rank", "dept", "account", "budget", "ytd", "slope", "icpt", "yearEnd", "tstar", "date", "status", "qdate", _
+        "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12")) & "," & vbLf
     js = js & """ifrs17"": " & Ifrs17Json() & "," & vbLf
 
     ' TOP 10과 각 항목의 원인분석 (원인분석 시트 선택값을 바꿔가며 계산 후 원래대로 복원)
@@ -553,7 +555,7 @@ for k_, v_ in {"{SUMR}": IFL["SUMR"], "{A01}": IFL["A0"] + 1, "{B01}": IFL["B0"]
 for tag, nm in (("BP", "예산판_원본"), ("TB", "TB_원본"), ("JE", "전표_원본"), ("BS", "BS_원본"), ("PL", "PL_원본"), ("EX", "예정사업비"), ("RF", "부채변동표")):
     VBA = VBA.replace("{" + tag + "0}", str(FMX[nm][0])).replace("{" + tag + "N}", str(FMX[nm][1])).replace("{" + tag + "K}", str(FMX[nm][2]))
 rep = {"{CDG1}": CD["CDG"] + 1, "{NKPI}": CD["NKPI"], "{CDA1}": CD["CDA"] + 1, "{CDB1}": CD["CDB"] + 1, "{NDEPT}": CD["NDEPT"],
-       "{CDC1}": CD["CDC"] + 1, "{CDD1}": CD["CDD"] + 1, "{NGL}": CD["NGL"], "{CDE1}": CD["CDE"] + 1, "{CDF1}": CD["CDF"] + 1, "{AT}": AT}
+       "{CDC1}": CD["CDC"] + 1, "{CDD1}": CD["CDD"] + 1, "{NGL}": CD["NGL"], "{CDE1}": CD["CDE"] + 1, "{CDF1}": CD["CDF"] + 1, "{CDH1}": CD["CDH"] + 1, "{NBURN1}": CD["NBURN"] + 1, "{AT}": AT}
 for k, v in rep.items(): VBA = VBA.replace(k, str(v))
 assert "{" not in VBA.replace('"{', "").replace("{""", "") or True
 VBA.encode("cp949")

@@ -3,103 +3,74 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="trace.css">
 <title>TRACE IFRS 17 연결</title>
 <style>
-/* 레이아웃: 상단 메뉴 → 왼쪽(전표)에서 오른쪽(손익·CSM)으로 흐르는 연결도 + 노드 상세 → 탭(모형별 처리 · 입력 자료 · 대사 포인트) */
-:root {
-  --bg: #f3f5f4; --surface: #ffffff; --ink: #16231f; --muted: #5b6b66; --line: #c9d3cf; --grid: #e6ebe8;
-  --accent: #17705a; --accent-soft: #e1f0ea; --pl: #9a6512; --pl-soft: #fbf0dc; --csm: #2f5d9e; --csm-soft: #e3ebf7;
-  --inv: #6b4fa0; --inv-soft: #ece6f6; --off: #8a9792; --off-soft: #eef1f0;
-  --font: "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
-  --mono: Consolas, "SFMono-Regular", Menlo, ui-monospace, monospace;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #33433d; --grid: #222d29;
-    --accent: #4fbf9a; --accent-soft: #183128; --pl: #e0a84a; --pl-soft: #33281a; --csm: #82a9e8; --csm-soft: #1b2638;
-    --inv: #b49be0; --inv-soft: #2a2238; --off: #6f7d78; --off-soft: #1d2522; color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0f1513; --surface: #17201d; --ink: #e4ece8; --muted: #93a49e; --line: #33433d; --grid: #222d29;
-  --accent: #4fbf9a; --accent-soft: #183128; --pl: #e0a84a; --pl-soft: #33281a; --csm: #82a9e8; --csm-soft: #1b2638;
-  --inv: #b49be0; --inv-soft: #2a2238; --off: #6f7d78; --off-soft: #1d2522; color-scheme: dark;
-}
-* { box-sizing: border-box; }
-[hidden] { display: none !important; }
-html, body { margin: 0; }
-body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.65; padding-inline: 16px; }
 .wrap { max-width: 1240px; margin: 0 auto; padding-block: 28px 64px; display: grid; gap: 28px; }
-h1, h2, h3 { margin: 0; line-height: 1.3; text-wrap: balance; }
-h1 { font-size: clamp(24px, 3.4vw, 32px); } h2 { font-size: 19px; } h3 { font-size: 15.5px; }
-p { margin: 0; }
-.eyebrow { font-size: 12px; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
-.muted { color: var(--muted); }
-.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
-.topnav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 6; background: var(--ink); color: var(--bg); margin-inline: -16px; padding: 0 16px; }
-.topnav .in { max-width: 1240px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; min-height: 48px; }
-.topnav .brand { font-weight: 800; letter-spacing: .06em; font-size: 16px; color: var(--bg); text-decoration: none; }
-.topnav .brand small { font-weight: 500; letter-spacing: 0; opacity: .7; font-size: 12px; margin-left: 6px; }
-.topnav nav { display: flex; flex-wrap: wrap; gap: 2px; }
-.topnav nav a { color: var(--bg); opacity: .78; text-decoration: none; font-size: 13.5px; padding: 6px 10px; border-radius: 6px; }
-.topnav nav a:hover { opacity: 1; background: color-mix(in srgb, var(--bg) 14%, transparent); }
-.topnav nav a[aria-current="page"] { opacity: 1; font-weight: 700; background: color-mix(in srgb, var(--bg) 18%, transparent); }
-.lede { color: var(--muted); max-width: 72ch; }
-.lede b { color: var(--ink); }
 .keys { display: flex; flex-wrap: wrap; gap: 8px; font-size: 13px; }
-.key { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 12px; }
+.key { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 12px; }
 .key i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 6px; overflow-x: auto; }
-.diagram svg { display: block; min-width: 1080px; width: 100%; height: auto; }
-.node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.3; transition: stroke .15s; }
-.node .t { font-family: var(--font); font-size: 14px; font-weight: 700; fill: var(--ink); }
-.node .s { font-family: var(--font); font-size: 11.5px; fill: var(--muted); }
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 6px 4px 10px; overflow-x: auto; }
+.diagram svg { display: block; min-width: 1100px; width: 100%; height: auto; }
+.band { fill: var(--surface-2); }
+.stage-n { font-family: var(--mono); font-size: 13px; font-weight: 700; fill: var(--accent); }
+.stage-t { font-family: var(--font); font-size: 14px; font-weight: 700; fill: var(--muted); letter-spacing: .02em; }
+.node rect { fill: var(--surface); stroke: var(--line); stroke-width: 1.4; transition: stroke .15s, fill .15s; }
+.node .t { font-family: var(--font); font-size: 16px; font-weight: 800; fill: var(--ink); }
+.node .s { font-family: var(--font); font-size: 12.5px; fill: var(--muted); }
+.node .dot { fill: var(--off); }
 .node { cursor: pointer; outline: none; }
 .node:hover rect { stroke: var(--accent); }
 .node:focus-visible rect { stroke: var(--accent); stroke-width: 2.5; }
-.node.k-pl rect { fill: var(--pl-soft); } .node.k-csm rect { fill: var(--csm-soft); } .node.k-inv rect { fill: var(--inv-soft); }
-.node.on rect { stroke: var(--accent); stroke-width: 2.6; }
-.edge path { fill: none; stroke: var(--line); stroke-width: 1.8; }
+.node.k-pl rect { fill: var(--pl-soft); stroke: color-mix(in srgb, var(--pl) 35%, var(--line)); } .node.k-pl .dot { fill: var(--pl); }
+.node.k-csm rect { fill: var(--csm-soft); stroke: color-mix(in srgb, var(--csm) 35%, var(--line)); } .node.k-csm .dot { fill: var(--csm); }
+.node.k-inv rect { fill: var(--inv-soft); stroke: color-mix(in srgb, var(--inv) 35%, var(--line)); } .node.k-inv .dot { fill: var(--inv); }
+.node.on rect { stroke: var(--accent); stroke-width: 2.8; filter: drop-shadow(0 3px 8px color-mix(in srgb, var(--accent) 28%, transparent)); }
+.node.on .dot { fill: var(--accent); }
+.edge path { fill: none; stroke: color-mix(in srgb, var(--muted) 45%, var(--line)); stroke-width: 1.8; transition: stroke .15s; }
 .edge.dash path { stroke-dasharray: 5 4; }
-.edge text { font-family: var(--font); font-size: 11px; fill: var(--muted); }
-.edge.on path { stroke: var(--accent); stroke-width: 2.6; }
-.edge.on text { fill: var(--accent); font-weight: 700; }
-#arrow path { fill: var(--line); } #arrowOn path { fill: var(--accent); }
-.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
-.panel > div { padding: 22px 24px; display: grid; gap: 12px; align-content: start; min-width: 0; }
-.panel .ex { border-left: 1px solid var(--line); background: color-mix(in srgb, var(--accent-soft) 40%, var(--surface)); border-radius: 0 12px 12px 0; }
-@media (max-width: 780px) { .panel { grid-template-columns: 1fr; } .panel .ex { border-left: none; border-top: 1px solid var(--line); border-radius: 0 0 12px 12px; } }
-.panel ul { margin: 0; padding-left: 18px; display: grid; gap: 5px; }
-.where { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 13.5px; margin: 0; }
-.where dt { color: var(--muted); } .where dd { margin: 0; }
+.edge text { font-family: var(--font); font-size: 13px; fill: var(--muted); paint-order: stroke; stroke: var(--surface); stroke-width: 5px; stroke-linejoin: round; }
+.edge.on path { stroke: var(--accent); stroke-width: 2.8; }
+.edge.on text { fill: var(--accent); font-weight: 800; }
+#arrow path { fill: color-mix(in srgb, var(--muted) 45%, var(--line)); } #arrowOn path { fill: var(--accent); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); overflow: hidden; }
+.panel > div { padding: 22px 24px; display: grid; gap: 14px; align-content: start; min-width: 0; }
+.panel .ex { border-left: 1px solid var(--line); background: var(--surface-2); }
+@media (max-width: 780px) { .panel { grid-template-columns: 1fr; } .panel .ex { border-left: none; border-top: 1px solid var(--line); } }
+.panel ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.p-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.step { font-family: var(--mono); font-size: 12.5px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 1px 8px; }
+.prog { display: grid; grid-template-columns: repeat(15, 1fr); gap: 3px; }
+.prog button { height: 6px; padding: 0; border: none; border-radius: 3px; background: var(--grid); cursor: pointer; }
+.prog button.done { background: color-mix(in srgb, var(--accent) 40%, var(--grid)); }
+.prog button.cur { background: var(--accent); }
+.where { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13.5px; margin: 0; padding: 12px 14px; background: var(--surface-2); border-radius: 8px; }
+.where dt { color: var(--muted); font-weight: 700; font-size: 12px; letter-spacing: .04em; padding-top: 1px; } .where dd { margin: 0; }
 .nav { display: flex; justify-content: space-between; gap: 8px; }
-.btn2 { font: inherit; font-size: 13px; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.btn2 { font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
 .btn2:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); } .btn2:disabled { opacity: .4; cursor: default; }
-.btn2:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.ex-label { font-size: 12px; color: var(--muted); } .ex-label b { color: var(--ink); }
-.calc { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-.calc td { padding: 6px 4px; border-bottom: 1px solid var(--line); }
+.ex-label { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: .04em; } .ex-label b { color: var(--ink); }
+.calc { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.calc td { padding: 8px 12px; border-bottom: 1px dashed var(--line); }
 .calc td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .calc tr:last-child td { border-bottom: none; }
-.tabs { display: flex; flex-wrap: wrap; gap: 6px; border-bottom: 1px solid var(--line); }
-.tabs button { font: inherit; font-size: 14px; color: var(--muted); background: none; border: none; border-bottom: 3px solid transparent; padding: 8px 12px; cursor: pointer; margin-bottom: -1px; }
-.tabs button[aria-selected="true"] { color: var(--ink); font-weight: 700; border-bottom-color: var(--accent); }
-.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.tag { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
-.tag.pl { background: var(--pl-soft); color: var(--pl); } .tag.csm { background: var(--csm-soft); color: var(--csm); } .tag.inv { background: var(--inv-soft); color: var(--inv); }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow-x: auto; }
-table.grid { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
-table.grid th, table.grid td { padding: 11px 16px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
-table.grid thead th { font-size: 12px; color: var(--muted); font-weight: 600; }
-table.grid tbody th { font-weight: 700; white-space: nowrap; }
-table.grid tr:last-child td, table.grid tr:last-child th { border-bottom: none; }
+.models { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .models { grid-template-columns: 1fr; } }
+.model { padding: 16px 18px; display: grid; gap: 12px; align-content: start; }
+.model header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.model .code { font-family: var(--mono); font-size: 20px; font-weight: 800; letter-spacing: .02em; }
+.model .pfs { font-size: 12.5px; color: var(--muted); }
+.model dl { margin: 0; display: grid; gap: 10px; }
+.model dl > div { display: grid; gap: 4px; padding-top: 10px; border-top: 1px solid var(--grid); }
+.model dt { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .03em; }
+.model dd { margin: 0; font-size: 13.5px; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
 .checks { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.checks li { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: grid; gap: 4px; font-size: 14px; }
+.checks li { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; display: grid; grid-template-columns: 22px 1fr; gap: 2px 10px; font-size: 14px; }
+.checks li::before { content: "="; grid-row: span 2; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-family: var(--mono); font-weight: 800; font-size: 14px; }
 @media (max-width: 700px) { .checks { grid-template-columns: 1fr; } }
-.note { background: var(--off-soft); border: 1px dashed var(--line); border-radius: 12px; padding: 14px 18px; font-size: 14px; display: grid; gap: 6px; }
-footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.note { background: var(--off-soft); border: 1px dashed color-mix(in srgb, var(--off) 50%, var(--line)); border-radius: var(--radius); padding: 14px 18px; font-size: 14px; display: grid; gap: 6px; }
+
 </style>
 </head>
 <body>
@@ -114,11 +85,12 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
   </nav>
 </div></header>
 <div class="wrap">
-  <header style="display:grid;gap:10px">
-    <span class="eyebrow">IFRS 17 · GMM · VFA · PAA</span>
+  <header class="page-head">
+    <span class="eyebrow">IFRS 17 연결 · GMM · VFA · PAA</span>
     <h1>사업비 전표가 손익과 CSM에 닿는 길</h1>
     <p class="lede">IFRS 4·9 기준으로 친 사업비 전표는 <b>계정대체</b>로 IFRS 17 계정이 됩니다. 특정 계정은 지정 계정으로 바로 가고, 공통비는 <b>투자관련부서의 유지비 성격분을 재산관리비로 먼저 넘긴 뒤</b> 쓴 부서의 비율대로 나뉩니다. 귀속 사업비는 포트폴리오별로 계리 예정사업비와 비교되고, 그 차이가 측정모형에 따라 <b>CSM</b> 또는 <b>당기손익</b>으로 갑니다. 노드를 누르면 처리 방법과 예시가 나옵니다.</p>
-    <div class="keys">
+    <div class="keys" aria-label="색 구분">
+      <span class="key"><i style="background:var(--off)"></i>처리 단계</span>
       <span class="key"><i style="background:var(--pl-soft);border:1px solid var(--pl)"></i>당기손익</span>
       <span class="key"><i style="background:var(--csm-soft);border:1px solid var(--csm)"></i>CSM</span>
       <span class="key"><i style="background:var(--inv-soft);border:1px solid var(--inv)"></i>투자손익 (재산관리비)</span>
@@ -127,22 +99,24 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
   </header>
 
   <section style="display:grid;gap:14px">
-    <div class="diagram"><svg viewBox="0 0 1230 650" role="group" aria-label="사업비 IFRS 17 연결도">
+    <div class="diagram"><svg viewBox="0 0 1590 712" role="group" aria-label="사업비 IFRS 17 연결도">
       <defs>
         <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
         <marker id="arrowOn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
       </defs>
-      <g id="edges"></g><g id="nodes"></g>
+      <g id="bands"></g><g id="edges"></g><g id="nodes"></g><g id="labels"></g>
     </svg></div>
     <div class="panel" aria-live="polite">
       <div>
-        <h3 id="p-t"></h3>
+        <div class="prog" id="prog" aria-label="단계 이동"></div>
+        <div class="p-head"><span class="step" id="p-n"></span><span id="p-k"></span></div>
+        <h3 id="p-t" style="font-size:19px"></h3>
         <ul id="p-d"></ul>
-        <dl class="where"><dt>TRACE</dt><dd id="p-w"></dd><dt>자료</dt><dd id="p-s"></dd></dl>
+        <dl class="where"><dt>TRACE 시트</dt><dd id="p-w"></dd><dt>받는 자료</dt><dd id="p-s"></dd></dl>
         <div class="nav"><button type="button" class="btn2" id="prev">← 이전</button><button type="button" class="btn2" id="next">다음 →</button></div>
       </div>
       <div class="ex">
-        <p class="ex-label">예시 · 백만원 · 가상 수치</p>
+        <p class="ex-label">예시 · 9월 · 단위 백만원 · 가상 수치</p>
         <div id="p-e" style="display:grid;gap:10px"></div>
       </div>
     </div>
@@ -156,13 +130,20 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
     </div>
     <div data-p="model" style="display:grid;gap:10px">
       <p class="muted">회사 회계정책과 계리 방법론에 따라 세부 처리가 다를 수 있으니, 실제 적용 전에 계리·회계팀과 확인하세요.</p>
-      <div class="card"><table class="grid">
-        <thead><tr><th>모형 (TRACE 포트폴리오)</th><th>신계약비 경험차이</th><th>유지·수금비 경험차이</th><th>사업비 가정변경</th></tr></thead>
-        <tbody>
-          <tr><th>GMM · 보장성, 저축성</th><td><span class="tag csm">CSM 조정</span> 미래 서비스 관련 → 상각으로 나눠 손익 반영</td><td><span class="tag pl">당기손익</span> 보험서비스결과</td><td><span class="tag csm">BEL·CSM</span> 미래 사업비 증가분만큼 BEL ↑ CSM ↓</td></tr>
-          <tr><th>VFA · 변액 (특별계정)</th><td><span class="tag csm">CSM 조정</span> 미래 서비스 관련 → 상각으로 손익 반영</td><td><span class="tag pl">당기손익</span> 보험서비스결과</td><td><span class="tag csm">BEL·CSM</span></td></tr>
-          <tr><th>PAA · 단체(단기)</th><td><span class="tag pl">당기손익</span> CSM 없음</td><td><span class="tag pl">당기손익</span></td><td>해당 적음</td></tr>
-        </tbody></table></div>
+      <div class="models">
+        <article class="card model"><header><span class="code">GMM</span><span class="pfs">일반모형 · 보장성 PF01, 저축성 PF02</span></header>
+          <dl><div><dt>신계약비 경험차이</dt><dd><span class="tag csm">CSM 조정</span>미래 서비스 관련 → 상각(F51)으로 나눠 손익 반영</dd></div>
+          <div><dt>유지·수금비 경험차이</dt><dd><span class="tag pl">당기손익</span>보험서비스결과</dd></div>
+          <div><dt>사업비 가정변경 (F21)</dt><dd><span class="tag csm">BEL·CSM</span>미래 사업비 증가분만큼 BEL ↑ CSM ↓</dd></div></dl></article>
+        <article class="card model"><header><span class="code">VFA</span><span class="pfs">변동수수료모형 · 변액 PF04 (특별계정)</span></header>
+          <dl><div><dt>신계약비 경험차이</dt><dd><span class="tag csm">CSM 조정</span>미래 서비스 관련 → 상각으로 손익 반영</dd></div>
+          <div><dt>유지·수금비 경험차이</dt><dd><span class="tag pl">당기손익</span>보험서비스결과</dd></div>
+          <div><dt>사업비 가정변경 (F21)</dt><dd><span class="tag csm">BEL·CSM</span>GMM과 같은 방향, 브리지는 따로 표시</dd></div></dl></article>
+        <article class="card model"><header><span class="code">PAA</span><span class="pfs">보험료배분접근법 · 단체(단기) PF03</span></header>
+          <dl><div><dt>신계약비 경험차이</dt><dd><span class="tag pl">당기손익</span>CSM이 없어 바로 손익</dd></div>
+          <div><dt>유지·수금비 경험차이</dt><dd><span class="tag pl">당기손익</span>보험서비스결과</dd></div>
+          <div><dt>사업비 가정변경</dt><dd><span class="muted">영향 적음 (보장기간 1년 이하)</span></dd></div></dl></article>
+      </div>
     </div>
     <div data-p="data" hidden>
       <div class="card"><table class="grid">
@@ -198,28 +179,31 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
 <script>
 (function () {
   "use strict";
-  var W = 156, H = 64;
+  var W = 168, H = 70, SX = 232, OY = 56;
+  function col(c) { return 14 + SX * c; }
   var N = {
-    je:     { x: 10,   y: 270, t: "사업비 전표", s: "IFRS 4·9 기준 원장" },
-    sub:    { x: 185,  y: 270, t: "계정대체", s: "IFRS 4·9 → IFRS 17" },
-    direct: { x: 360,  y: 100, t: "직접대체", s: "특정 계정 → 지정 계정" },
-    common: { x: 360,  y: 400, t: "공통비", s: "부서가 쓴 공통 경비" },
-    dept:   { x: 535,  y: 330, t: "부서별 비율 대체", s: "남은 공통비" },
-    inv:    { x: 535,  y: 560, t: "재산관리비 대체", s: "투자부서 유지비 × 연간 비율", k: "inv" },
-    non:    { x: 710,  y: 40,  t: "비귀속", s: "이행현금흐름 밖" },
-    cats:   { x: 710,  y: 200, t: "신계약 · 유지 · 수금", s: "귀속 사업비" },
-    pf:     { x: 885,  y: 200, t: "포트폴리오 경험차이", s: "예정 − 실제" },
-    expd:   { x: 885,  y: 330, t: "예정사업비", s: "계리 · BEL 현금흐름" },
-    assume: { x: 885,  y: 450, t: "가정변경-사업비", s: "단위사업비 가정 (F21)", k: "csm" },
-    plo:    { x: 1065, y: 40,  t: "기타사업비용", s: "PL · 당기손익", k: "pl" },
-    isr:    { x: 1065, y: 170, t: "보험서비스결과", s: "PL · 당기손익", k: "pl" },
-    csm:    { x: 1065, y: 300, t: "CSM 조정", s: "GMM · VFA (F31)", k: "csm" },
-    invpl:  { x: 1065, y: 560, t: "투자손익", s: "PL · 재산관리비", k: "inv" }
+    je:     { c: 0, y: 270, t: "사업비 전표", s: "IFRS 4·9 기준 원장" },
+    sub:    { c: 1, y: 270, t: "계정대체", s: "IFRS 4·9 → IFRS 17" },
+    direct: { c: 2, y: 100, t: "직접대체", s: "특정 계정 → 지정 계정" },
+    common: { c: 2, y: 420, t: "공통비", s: "부서가 쓴 공통 경비" },
+    dept:   { c: 3, y: 330, t: "부서별 비율 대체", s: "남은 공통비" },
+    inv:    { c: 3, y: 560, t: "재산관리비 대체", s: "투자부서 유지비×비율", k: "inv" },
+    non:    { c: 4, y: 30,  t: "비귀속", s: "이행현금흐름 밖" },
+    cats:   { c: 4, y: 200, t: "신계약·유지·수금", s: "귀속 사업비" },
+    pf:     { c: 5, y: 200, t: "경험차이", s: "포트폴리오별 예정 − 실제" },
+    expd:   { c: 5, y: 340, t: "예정사업비", s: "계리 · BEL 현금흐름" },
+    assume: { c: 5, y: 470, t: "가정변경-사업비", s: "단위사업비 가정 (F21)", k: "csm" },
+    plo:    { c: 6, y: 30,  t: "기타사업비용", s: "PL · 당기손익", k: "pl" },
+    isr:    { c: 6, y: 160, t: "보험서비스결과", s: "PL · 당기손익", k: "pl" },
+    csm:    { c: 6, y: 300, t: "CSM 조정", s: "GMM · VFA (F31)", k: "csm" },
+    invpl:  { c: 6, y: 560, t: "투자손익", s: "PL · 재산관리비", k: "inv" }
   };
-  var E = [["je", "sub"], ["sub", "direct", "특정 계정"], ["sub", "common", "그 외"], ["direct", "non", "광고선전비 등"], ["direct", "cats", "모집·수금 수수료"],
-           ["common", "dept", "남은 금액"], ["common", "inv", "투자부서 · 유지비"], ["dept", "cats"], ["dept", "non"], ["inv", "invpl", "재산관리비"],
-           ["non", "plo", "비귀속 전액"], ["cats", "pf", "실제"], ["expd", "pf", "예정", 0, "v"], ["pf", "isr", "유지·수금 / PAA"], ["pf", "csm", "GMM·VFA 신계약비"],
-           ["cats", "assume", "실적 추세", 1], ["assume", "csm", "BEL↑ CSM↓", 1]];
+  Object.keys(N).forEach(function (k) { N[k].x = col(N[k].c); N[k].y += OY; });
+  var STAGES = ["전표", "계정대체", "대체 경로", "공통비 배분", "IFRS 17 구분", "경험차이 · 계리", "재무제표 반영"];
+  var E = [["je", "sub"], ["sub", "direct", "특정 계정"], ["sub", "common", "그 외"], ["direct", "non", "광고선전비 등"], ["direct", "cats", "모집·수금\n수수료"],
+           ["common", "dept", "남은 금액"], ["common", "inv", "투자부서\n유지비"], ["dept", "cats"], ["dept", "non"], ["inv", "invpl", "재산관리비"],
+           ["non", "plo", "비귀속 전액"], ["cats", "pf", "실제"], ["expd", "pf", "예정", 0, "v"], ["pf", "isr", "유지·수금\nPAA"], ["pf", "csm", "신계약비\nGMM·VFA"],
+           ["cats", "assume", "실적 추세", 1], ["assume", "csm", "BEL↑\nCSM↓", 1]];
   var D = {
     je: { t: "사업비 전표 (IFRS 4·9)", d: ["회계 전표는 IFRS 4·9 기준 원장 계정으로 칩니다.", "계정, 부서(코스트센터), 거래처, 적요가 이후 계정대체와 원인 분석에 쓰입니다."], w: "전표_원본", s: "SAP 전표조회",
       e: '<table class="calc"><tr><td>시책비</td><td class="n">모집수수료 · GA채널 · 650.0</td></tr><tr><td>정보이용료</td><td class="n">지급수수료 · 자산운용팀 · 30.0</td></tr><tr><td>회의비</td><td class="n">회의비 · 고객서비스팀 · 4.0</td></tr></table>' },
@@ -253,37 +237,53 @@ footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--lin
       e: '<p>예시: 9월 보장성 단위사업비 가정 상향 → BEL <b class="mono">+1,200</b>, CSM <b class="mono">△1,200</b></p>' }
   };
   var ORDER = ["je", "sub", "direct", "common", "inv", "invpl", "dept", "non", "plo", "cats", "pf", "expd", "isr", "csm", "assume"];
-  var NS = "http://www.w3.org/2000/svg", eg = document.getElementById("edges"), ng = document.getElementById("nodes");
+  var NS = "http://www.w3.org/2000/svg", eg = document.getElementById("edges"), ng = document.getElementById("nodes"), lg = document.getElementById("labels"), bg = document.getElementById("bands");
   function mk(tag, attrs, parent) { var el = document.createElementNS(NS, tag); for (var k in attrs) el.setAttribute(k, attrs[k]); parent.appendChild(el); return el; }
+  STAGES.forEach(function (t, i) {
+    var x = col(i) - 32;
+    if (i % 2 === 0) mk("rect", { x: x, y: 0, width: SX, height: 712, "class": "band" }, bg);
+    var n = mk("text", { x: col(i), y: 30, "class": "stage-n" }, bg); n.textContent = "0" + (i + 1);
+    var tt = mk("text", { x: col(i) + 24, y: 30, "class": "stage-t" }, bg); tt.textContent = t;
+  });
   var edgeEls = E.map(function (e) {
     var a = N[e[0]], b = N[e[1]], g = mk("g", { "class": "edge" + (e[3] ? " dash" : "") }, eg), d, lx, ly;
     if (e[4] === "v") { var x = a.x + W / 2; d = "M" + x + "," + a.y + " L" + x + "," + (b.y + H + 4); lx = x + 22; ly = (a.y + b.y + H) / 2 + 4; }
     else { var x1 = a.x + W, y1 = a.y + H / 2, x2 = b.x - 4, y2 = b.y + H / 2, mx = (x1 + x2) / 2; d = "M" + x1 + "," + y1 + " C" + mx + "," + y1 + " " + mx + "," + y2 + " " + x2 + "," + y2; lx = mx; ly = (y1 + y2) / 2 - 6; }
     mk("path", { d: d, "marker-end": "url(#arrow)" }, g);
-    if (e[2]) { var t = mk("text", { x: lx, y: ly, "text-anchor": "middle" }, g); t.textContent = e[2]; }
-    return { g: g, a: e[0], b: e[1] };
+    var lab = null;
+    if (e[2]) {
+      lab = mk("g", { "class": "edge" + (e[3] ? " dash" : "") }, lg);
+      var lines = e[2].split("\n"), t = mk("text", { x: lx, y: ly - (lines.length - 1) * 7, "text-anchor": "middle" }, lab);
+      lines.forEach(function (ln, i) { var sp = mk("tspan", { x: lx, dy: i ? 15 : 0 }, t); sp.textContent = ln; });
+    }
+    return { g: g, lab: lab, a: e[0], b: e[1] };
   });
   var nodeEls = {};
   Object.keys(N).forEach(function (id) {
     var n = N[id], g = mk("g", { "class": "node" + (n.k ? " k-" + n.k : ""), tabindex: "0", role: "button", "aria-label": n.t }, ng);
-    mk("rect", { x: n.x, y: n.y, width: W, height: H, rx: 9 }, g);
-    var t1 = mk("text", { x: n.x + 12, y: n.y + 26, "class": "t" }, g); t1.textContent = n.t;
-    var t2 = mk("text", { x: n.x + 12, y: n.y + 46, "class": "s" }, g); t2.textContent = n.s;
+    mk("rect", { x: n.x, y: n.y, width: W, height: H, rx: 10 }, g);
+    mk("circle", { cx: n.x + 16, cy: n.y + 25, r: 4, "class": "dot" }, g);
+    var t1 = mk("text", { x: n.x + 28, y: n.y + 31, "class": "t" }, g); t1.textContent = n.t;
+    var t2 = mk("text", { x: n.x + 14, y: n.y + 54, "class": "s" }, g); t2.textContent = n.s;
     g.addEventListener("click", function () { show(id); });
     g.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); show(id); } });
     nodeEls[id] = g;
   });
-  var cur = "je";
+  var cur = "je", prog = document.getElementById("prog");
+  ORDER.forEach(function (id) { var b = document.createElement("button"); b.type = "button"; b.title = N[id].t; b.setAttribute("aria-label", N[id].t); b.addEventListener("click", function () { show(id); }); prog.appendChild(b); });
   function show(id) {
     cur = id;
     Object.keys(nodeEls).forEach(function (k) { nodeEls[k].classList.toggle("on", k === id); });
-    edgeEls.forEach(function (e) { var on = e.a === id || e.b === id; e.g.classList.toggle("on", on); e.g.querySelector("path").setAttribute("marker-end", on ? "url(#arrowOn)" : "url(#arrow)"); });
+    edgeEls.forEach(function (e) { var on = e.a === id || e.b === id; e.g.classList.toggle("on", on); if (e.lab) e.lab.classList.toggle("on", on); e.g.querySelector("path").setAttribute("marker-end", on ? "url(#arrowOn)" : "url(#arrow)"); });
     var d = D[id];
     document.getElementById("p-t").textContent = d.t;
     document.getElementById("p-d").innerHTML = d.d.map(function (x) { return "<li>" + x + "</li>"; }).join("");
     document.getElementById("p-w").textContent = d.w; document.getElementById("p-s").textContent = d.s;
     document.getElementById("p-e").innerHTML = d.e;
-    var i = ORDER.indexOf(id);
+    var i = ORDER.indexOf(id), K = { pl: ["pl", "당기손익"], csm: ["csm", "CSM"], inv: ["inv", "투자손익"] }[N[id].k];
+    document.getElementById("p-n").textContent = String(i + 1).padStart(2, "0") + " / " + ORDER.length;
+    document.getElementById("p-k").innerHTML = K ? '<span class="tag ' + K[0] + '">' + K[1] + '</span>' : '<span class="muted" style="font-size:12.5px">' + STAGES[N[id].c] + '</span>';
+    prog.querySelectorAll("button").forEach(function (b, j) { b.className = j < i ? "done" : j === i ? "cur" : ""; b.setAttribute("aria-current", j === i ? "step" : "false"); });
     document.getElementById("prev").disabled = i <= 0; document.getElementById("next").disabled = i >= ORDER.length - 1;
   }
   document.getElementById("prev").addEventListener("click", function () { var i = ORDER.indexOf(cur); if (i > 0) show(ORDER[i - 1]); });

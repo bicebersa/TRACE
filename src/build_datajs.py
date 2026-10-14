@@ -70,6 +70,37 @@ for d, gl in KEYS:
                  row=7 + KEYS.index((d, gl)))
 rank = sorted(VA, key=lambda k: VA[k]["AA"] + VA[k]["row"] / 1e6, reverse=True)[:10]
 
+# ---------------- 소진 추세 (선형): 점 (0,0)…(M,누계)에 최소제곱 직선 → 연간가용에 닿는 시점
+def xround(x): return math.floor(abs(x) + 0.5) * (1 if x >= 0 else -1)   # 엑셀 ROUND(x,0)
+def dstr(d0, t): return (d0 + dt.timedelta(days=xround(t * 365 / 12) - 1)).isoformat()
+def burn(cum, avail, ytd, qlim, qact):
+    n = M + 1; St = M * (M + 1) / 2; Stt = M * (M + 1) * (2 * M + 1) / 6
+    SC = sum(cum); StC = sum((i + 1) * c for i, c in enumerate(cum))
+    b = (n * StC - St * SC) / (n * Stt - St ** 2); a = (SC - b * St) / n
+    t = "" if (avail <= 0 or ytd >= avail or b <= 0) else max(M, (avail - a) / b)
+    st = ("무예산" if avail <= 0 and ytd > 0 else "-" if avail <= 0 else "이미 소진" if ytd >= avail else "소진 안 됨" if b <= 0 else "연내 고갈" if t <= 12 else "연내 여유")
+    date = ("소진됨" if st == "이미 소진" else "") if t == "" else dstr(dt.date(Y, 1, 1), t)
+    e = P - QS + 1
+    if qlim <= 0: qd = ""
+    elif qact >= qlim: qd = "한도 소진"
+    elif qact <= 0: qd = ""
+    elif qlim / (qact / e) > 3: qd = "분기 내 여유"
+    else: qd = dstr(dt.date(Y, QS - Y * 12, 1), max(e, qlim / (qact / e)))
+    return dict(slope=b, icpt=a, yearEnd=a + b * 12, tstar=t, date=date, status=st, qdate=qd)
+for k, v in VA.items():
+    v["cum"] = [sum(v["mon"][p] for p in range(Y * 12 + 1, Y * 12 + j + 1)) if j <= M else 0 for j in range(1, 13)]
+    v.update(burn(v["cum"], v["P"], v["Q"], v["AJ"], v["AK"]))
+    v["AW"] = v["row"] / 1e6 + (0 if v["status"] == "이미 소진" else v["tstar"] if v["status"] == "연내 고갈" else 99)
+def burnrow(rank_, dept, account, budget, ytd, b, cum):
+    o = dict(rank=rank_, dept=dept, account=account, budget=budget, ytd=ytd, slope=b["slope"], icpt=b["icpt"], yearEnd=b["yearEnd"],
+             tstar=b["tstar"], date=b["date"], status=b["status"], qdate=b["qdate"])
+    o.update({f"c{j + 1}": c for j, c in enumerate(cum)}); return o
+tcum = [sum(v["cum"][j] for v in VA.values()) for j in range(12)]
+tav, tytd = sum(v["P"] for v in VA.values()), sum(v["Q"] for v in VA.values())
+burnrows = [burnrow("전사", "전사", "사업비 합계", tav, tytd, burn(tcum, tav, tytd, sum(v["AJ"] for v in VA.values()), sum(v["AK"] for v in VA.values())), tcum)]
+for i, k in enumerate([k for k in sorted(VA, key=lambda k: VA[k]["AW"]) if VA[k]["AW"] < 99][:15], 1):
+    v = VA[k]; burnrows.append(burnrow(i, DEPTS[v["d"]], GLN[v["gl"]], v["P"], v["Q"], v, v["cum"]))
+
 # ---------------- 원인분석 (비교 기준: 전월)
 def cause(k):
     cs = ce = P; ps = pe = P - 1
@@ -256,7 +287,7 @@ ifrs17 = dict(summary=summary17, alloc=alloc, pf=pfrows, totals=dict(csm=tcsm, c
               csmChange=csm_chg, csmExpense=csm_exp, csmChangeVfa=vcsm_chg, csmExpenseVfa=vcsm_exp, drivers=[{k: v for k, v in d.items() if k != "sk"} for d in drivers], evidence=evidence17)
 
 data = dict(meta=dict(company="예시보험㈜", period=plab(P), unit="백만원", check="전체 정상 (참고 1건)", recon="전체 일치", generated="2026-10-14 (예시 데이터)"),
-            kpi=kpi, monthly=monthly, depts=depts, status=status, accounts=accounts, bs=bsrows, pl=plrows, top10=top10, ifrs17=ifrs17)
+            kpi=kpi, monthly=monthly, depts=depts, status=status, accounts=accounts, bs=bsrows, pl=plrows, burn=burnrows, top10=top10, ifrs17=ifrs17)
 def rnd(o):
     if isinstance(o, float): return round(o, 4)
     if isinstance(o, dict): return {k: rnd(v) for k, v in o.items()}
@@ -265,3 +296,4 @@ def rnd(o):
 open(OUT, "w", encoding="utf-8").write("window.TRACE_DATA = " + json.dumps(rnd(data), ensure_ascii=False, indent=1) + ";\n")
 print("wrote", OUT)
 for t in top10: print(t["rank"], t["dept"], t["account"], t["status"], t["signal"], "|", [c["pattern"] for c in t["cause"]["candidates"]])
+for b in burnrows: print("소진", b["rank"], b["dept"], b["account"], round(b["budget"], 1), round(b["ytd"], 1), round(b["slope"], 2), b["tstar"] if b["tstar"] == "" else round(b["tstar"], 2), b["date"], b["status"], b["qdate"])
