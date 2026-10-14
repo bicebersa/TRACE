@@ -46,8 +46,16 @@ function systemPrompt(context) {
 ${context}`;
 }
 
+// claude.ai 아티팩트(TRACE 대시보드)처럼 다른 주소의 페이지에서도 부를 수 있게 허용한다. 쿠키를 쓰지 않으므로 '*'로 충분하다.
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Max-Age': '86400',
+};
+
 function json(body, status = 200) {
-  return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
+  return Response.json(body, { status, headers: { 'Cache-Control': 'no-store', ...CORS } });
 }
 
 function allowedModels() {
@@ -85,6 +93,10 @@ function missingKeyMessage() {
     (similar.length ? `비슷한 이름: ${similar.join(', ')}. ` : '') +
     'Vercel 프로젝트 Settings → Environment Variables에서 이 환경에 키를 넣은 뒤, 그다음에 다시 배포하세요.'
   );
+}
+
+export function OPTIONS() {
+  return new Response(null, { status: 204, headers: CORS });
 }
 
 export function GET() {
@@ -180,6 +192,6 @@ export async function POST(request) {
   });
 
   return new Response(stream, {
-    headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store' },
+    headers: { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', ...CORS },
   });
 }
