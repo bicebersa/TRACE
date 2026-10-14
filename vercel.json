@@ -8,10 +8,6 @@
     {
       "source": "/",
       "destination": "/TRACE_대시보드.html"
-    },
-    {
-      "source": "/chat",
-      "destination": "/index.html"
     }
   ]
 }

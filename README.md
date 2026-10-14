@@ -24,7 +24,7 @@ SAP 예산판·시산표(TB)·전표와 감독원 양식 BS·PL·보험계약부
 | `modTrace.bas` | VBA 모듈 (CP949). 헤더 이름 불러오기 7종, 감독원 가로 양식 합치기, 대시보드 내보내기(data.js + 숨김 시트), 리포트 PDF |
 | `TRACE_대시보드.html` + `data.js` | HTML 대시보드. 상단 메뉴, 탭 5개, 엑셀(.xlsx·.xlsm)·data.js 업로드. 외부 리소스 없음 |
 | `TRACE_흐름.html` · `TRACE_IFRS17_연결.html` · `TRACE_사용설명서.html` · `TRACE_내려받기.html` | 처리 흐름, IFRS 17 연결 흐름, 사용설명서, 엑셀 양식·파일 내려받기 (상단 메뉴로 연결) |
-| `index.html` + `api/chat.js` | TRACE 도우미 챗봇 (Vercel 배포용, OpenRouter 무료 Nemotron). 외부망 전용 |
+| `chat.html` + `api/chat.js` | TRACE 도우미 챗봇 단독 페이지 (Vercel `/chat.html`, OpenRouter 무료 Nemotron). 외부망 전용. Vercel 첫 화면(`/`)은 대시보드 |
 | `trace.css` | HTML 5개가 함께 쓰는 디자인 (같은 폴더에 둠) |
 | `TRACE_v0.5_전체.zip` | 내부망 반입용 전체 묶음 (본체·매크로·HTML·data.js·양식) |
 | `samples/TRACE_입력양식_v0.5.xlsx` | 입력 양식 7종: 불러오기가 찾는 머리글(노란 = 필수) + 예시 3행 |
