@@ -23,7 +23,7 @@ for k, v in sol.items():
     try: val = v.value[0][0]
     except Exception: val = v
     out[k.upper()] = str(val)
-with open(sys.argv[2], "w") as fh: json.dump(out, fh, ensure_ascii=False)
+with open(sys.argv[2], "w", encoding="utf-8") as fh: json.dump(out, fh, ensure_ascii=False)
 sys.stdout.flush(); os._exit(0)
 '''
 
@@ -39,10 +39,14 @@ def main():
     book = [f for f in os.listdir(OUT) if f.startswith("TRACE_v") and f.endswith(".xlsx")][0]
     sol = os.path.join(OUT, "sol.json")
     print("2/3 수식 계산 (수 분 걸림)")
-    with open(os.path.join(OUT, "_eval.py"), "w") as fh: fh.write(EVAL)
-    subprocess.run([sys.executable, os.path.join(OUT, "_eval.py"), os.path.join(OUT, book), sol], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with open(os.path.join(OUT, "_eval.py"), "w", encoding="utf-8") as fh: fh.write(EVAL)
+    rr = subprocess.run([sys.executable, os.path.join(OUT, "_eval.py"), os.path.join(OUT, book), sol], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace")
+    if rr.returncode != 0:   # 계산 단계 오류는 원인 몇 줄만 보여 주고 멈춤 (예: formulas 미설치)
+        print("수식 계산 실패. 마지막 오류:\n" + "\n".join(rr.stderr.strip().splitlines()[-6:]))
+        if "No module named" in rr.stderr: print("→ 'py -m pip install openpyxl formulas' 를 실행한 뒤 다시 해 보세요.")
+        sys.exit(1)
     print("3/3 대조")
-    o = json.load(open(sol))
+    o = json.load(open(sol, encoding="utf-8"))
     tag = "[" + book.upper() + "]"
     def g(sh, c):
         v = o.get(f"'{tag}{sh}'!{c}")
