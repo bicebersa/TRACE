@@ -85,7 +85,16 @@ export function GET() {
 
 export async function POST(request) {
   const key = process.env.OPENROUTER_API_KEY;
-  if (!key) return json({ error: 'Vercel 환경변수 OPENROUTER_API_KEY가 없습니다.' }, 500);
+  if (!key) {
+    // 연동이 다른 이름으로 키를 넣었거나 환경(Preview/Production) 범위가 다를 때 원인을 바로 보이게 한다. 값은 내보내지 않는다.
+    const similar = Object.keys(process.env).filter((k) => /openrouter/i.test(k));
+    return json({
+      error:
+        `이 배포(${process.env.VERCEL_ENV || '알 수 없음'} 환경)에 환경변수 OPENROUTER_API_KEY가 없습니다. ` +
+        (similar.length ? `비슷한 이름: ${similar.join(', ')}. ` : '') +
+        'Vercel 프로젝트 Settings → Environment Variables에서 이 환경에 키를 넣고 다시 배포하세요.',
+    }, 500);
+  }
 
   let body;
   try {
