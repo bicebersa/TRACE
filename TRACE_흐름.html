@@ -1,4 +1,9 @@
-<title>TRACE 사업비 원인추적기</title>
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TRACE 처리 흐름</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
@@ -209,6 +214,29 @@ table.grid tr:last-child td, table.grid tr:last-child th { border-bottom: none; 
 footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
+<style>
+.topnav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 6; background: var(--ink); color: var(--bg); margin-inline: -16px; padding: 0 16px; }
+.topnav .in { max-width: 1240px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; min-height: 48px; }
+.topnav .brand { font-weight: 800; letter-spacing: .06em; font-size: 16px; color: var(--bg); text-decoration: none; }
+.topnav .brand small { font-weight: 500; letter-spacing: 0; opacity: .7; font-size: 12px; margin-left: 6px; }
+.topnav nav { display: flex; flex-wrap: wrap; gap: 2px; }
+.topnav nav a { color: var(--bg); opacity: .78; text-decoration: none; font-size: 13.5px; padding: 6px 10px; border-radius: 6px; }
+.topnav nav a:hover { opacity: 1; background: color-mix(in srgb, var(--bg) 14%, transparent); }
+.topnav nav a[aria-current="page"] { opacity: 1; font-weight: 700; background: color-mix(in srgb, var(--bg) 18%, transparent); }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+</style>
+</head>
+<body>
+<header class="topnav"><div class="in">
+  <a class="brand" href="TRACE_대시보드.html">TRACE<small>사업비 원인추적기</small></a>
+  <nav aria-label="TRACE 페이지">
+    <a href="TRACE_대시보드.html">대시보드</a>
+    <a href="TRACE_흐름.html" aria-current="page">처리 흐름</a>
+    <a href="TRACE_IFRS17_연결.html">IFRS 17 연결</a>
+    <a href="TRACE_사용설명서.html">사용설명서</a>
+  </nav>
+</div></header>
 
 <div class="wrap">
 
@@ -420,16 +448,20 @@ const STAGES = [
       </table>`
   },
   {
-    n: "④", t: "예산 점검", s: "여유 · 주의 · 부족 예상",
+    n: "④", t: "예산 점검", s: "분기 한도 · 연간 전망",
     does: [
-      "가용예산 = 배정 + 조정. 잔여 = 가용 − 누계 실적.",
-      "남은 기간 예상 실적을 두 방법으로 구해 큰 값을 씁니다 (보수적): 최근 3개월 평균 × 남은 개월, 전년 같은 시기의 비중으로 연간 추정.",
-      "예상 소진율 90% 이하 여유, 90~100% 주의, 100% 초과 부족 예상. 부족 금액과 소진 예상 월을 표시합니다.",
+      "예산 통제 단위는 부서 × 계정 × 분기 한도입니다. 분기 한도 = 그 분기의 배정 + 조정.",
+      "분기말 예상 = 분기 실적 + 최근 3개월 평균 × 분기에 남은 개월. 이미 넘었으면 한도 초과, 예상이 100% 넘으면 초과 예상, 90% 넘으면 주의.",
+      "연간 전망(배정 합계 대비 예상 연간 실적, 소진 예상 월)도 참고로 함께 보여줍니다.",
     ],
-    inp: "예산판, 월별 실적", out: "계정별 예산 판정, 부족 예상액, 소진 예상 월",
+    inp: "예산판 (부서 × 계정 × 분기), 월별 실적", out: "분기 판정 (여유·주의·초과 예상·한도 초과), 연간 전망",
     ex: () => `
       <table class="kv">
         <tbody>
+          <tr><td>3분기 한도 (배정 4.35 + 조정 0)</td><td class="num">4.35</td></tr>
+          <tr><td>3분기 실적 (7~9월)</td><td class="num">6.0</td></tr>
+          <tr><td><b>분기 판정</b></td><td class="num"><b>한도 초과</b></td></tr>
+          <tr><td colspan="2" class="muted" style="font-size:12px">연간 전망 (참고)</td></tr>
           <tr><td>연간 가용 (배정 18.0 + 조정 0)</td><td class="num">18.0</td></tr>
           <tr><td>누계 실적 1~9월</td><td class="num">15.8</td></tr>
           <tr><td>남은 3개월: 최근 평균 2.0 × 3</td><td class="num">6.0</td></tr>
@@ -439,7 +471,7 @@ const STAGES = [
       </table>
       <div style="display:grid; gap:6px;">
         <div class="bar" role="img" aria-label="예상 소진율 126%, 가용예산 100% 지점 표시"><i class="crit" style="width:100%"></i><span class="tick" style="left:79%"></span></div>
-        <p style="font-size:13px;"><span class="pill crit">부족 예상</span> 예상 소진율 126% · 4.6 부족 · 10월 중 잔여 2.2 소진 예상</p>
+        <p style="font-size:13px;"><span class="pill crit">분기 한도 초과</span> 3분기 한도의 138% 사용 · 연간으로도 126% 예상, 10월 중 잔여 소진</p>
       </div>`
   },
   {
@@ -535,3 +567,5 @@ pipe.addEventListener("keydown", e => {
 });
 show(0);
 </script>
+</body>
+</html>
