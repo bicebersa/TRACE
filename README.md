@@ -23,6 +23,7 @@ SAP 예산판·시산표(TB)·전표와 감독원 양식 BS·PL·보험계약부
 | `TRACE_대시보드.html` + `data.js` | HTML 대시보드 (외부 리소스 없음). `data.js`는 엑셀 [대시보드 내보내기]로 생성 |
 | `TRACE_흐름.html` | 프로젝트 7단계 흐름 설명 |
 | `TRACE_IFRS17_연결.html` | 사업비 전표 → 손익·CSM 연결 흐름 설명 (GMM 기준) |
+| `index.html` + `api/chat.js` | TRACE 도우미 챗봇 (Vercel 배포용, OpenRouter 무료 Nemotron). 외부망 전용 |
 | `samples/샘플_감독원양식_2026-09.xlsx` | 예시 감독원 양식 (재무상태표·손익계산서·보험계약부채 변동표, 가로형) |
 | `docs/` | 프로젝트 정의, 입력 양식 바꾸는 법 |
 | `src/` | 예시 엑셀·VBA·data.js·감독원 양식 샘플을 다시 만드는 Python 스크립트 |
@@ -43,6 +44,19 @@ SAP 예산판·시산표(TB)·전표와 감독원 양식 BS·PL·보험계약부
 4. 주의대상 TOP 10 → 원인분석 시트 `C5`에 순위 입력 → 원인 후보와 근거 전표 확인
 5. IFRS17_사업비 시트에서 CSM·당기손익 영향과 근거 전표 확인
 6. 담당 부서 확인 결과를 코멘트 시트에 입력 → [대시보드 내보내기] → `TRACE_대시보드.html`
+
+## TRACE 도우미 챗봇 (Vercel)
+
+TRACE 사용법·입력 양식·원인 추정 규칙·IFRS 17 연결을 묻는 챗봇입니다. README와 `docs/`를 근거로 답합니다. **외부망 서비스이므로 실제 업무 데이터는 입력하지 마세요.**
+
+1. Vercel 프로젝트 이름은 소문자로 정합니다 (예: `vercel --name trace`, 또는 처음 `vercel` 실행 때 이름에 `trace` 입력)
+2. Vercel 환경변수
+   - `OPENROUTER_API_KEY` (필수)
+   - `OPENROUTER_MODEL` (선택, 기본 `nvidia/nemotron-3-super-120b-a12b:free`)
+   - `CHAT_ACCESS_CODE` (선택, 설정하면 접속 코드를 입력해야 대화 가능)
+3. 배포하면 루트 주소(`/`)가 챗봇이고, 상단 링크로 대시보드·흐름·IFRS17 연결 페이지로 갑니다
+
+화면에서 고를 수 있는 모델은 무료(`:free`) Nemotron 3종(Super · Ultra · 3.5 Lightning)뿐입니다. 서버가 이 목록 밖의 모델 요청을 거절하므로 키의 유료 크레딧이 쓰이지 않습니다.
 
 ## 입력 자료
 
