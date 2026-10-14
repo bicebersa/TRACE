@@ -49,27 +49,41 @@ Public Sub ExportDashboard()
 
     js = "window.TRACE_DATA = {" & vbLf
     js = js & """meta"": " & MetaJson() & "," & vbLf
-    js = js & """kpi"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 87, 7, Array("label", "value", "compare", "rate", "basis")) & "," & vbLf
+    js = js & """kpi"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 87, 8, Array("label", "value", "compare", "rate", "basis")) & "," & vbLf
     js = js & """monthly"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 5, 12, Array("month", "cur", "prev", "budget")) & "," & vbLf
     js = js & """depts"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 20, 10, Array("code", "name", "avail", "ytd", "forecast", "rate", "status")) & "," & vbLf
     js = js & """status"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 31, 5, Array("status", "count")) & "," & vbLf
-    js = js & """accounts"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 38, 18, Array("gl", "name", "cur", "prevYear", "diff")) & "," & vbLf
+    js = js & """accounts"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 38, 18, Array("gl", "name", "cur", "prevYear", "diff", "prevMonth", "qCur", "qPrev", "ytd", "ytdPrev")) & "," & vbLf
     js = js & """bs"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 57, 12, Array("p", "period", "assets", "liabilities", "equity", "csm", "invested")) & "," & vbLf
     js = js & """pl"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 72, 12, Array("month", "niCur", "niPrev", "insCur", "invCur", "expCur", "insPrev")) & "," & vbLf
     js = js & """burn"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 97, 16, Array("rank", "dept", "account", "budget", "ytd", "slope", "icpt", "yearEnd", "tstar", "date", "status", "qdate", _
-        "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12")) & "," & vbLf
+        "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12", "row", "qlim", "qact", "pySlope")) & "," & vbLf
     js = js & """ifrs17"": " & Ifrs17Json() & "," & vbLf
 
     ' TOP 10과 각 항목의 원인분석 (원인분석 시트 선택값을 바꿔가며 계산 후 원래대로 복원)
     Set ca = ThisWorkbook.Worksheets(UHex("C6D0C778BD84C11D"))
     keep5 = ca.Range("C5").Value: keep6 = ca.Range("C6").Value: keep7 = ca.Range("C7").Value: keep8 = ca.Range("C8").Value
     ca.Range("C6").Value = UHex("C804C6D4"): ca.Range("C7").ClearContents: ca.Range("C8").ClearContents
+    ' 비교 기준 3개(전월 · 전분기 · 전년동기누적)마다 원인분석을 계산 (30번 재계산이라 1~2분 걸릴 수 있음)
     js = js & """top10"": [" & vbLf
+    Dim bases As Variant, bi As Long, cz As String, c0 As String
+    bases = Array(UHex("C804C6D4"), UHex("C804BD84AE30"), UHex("C804B144B3D9AE30B204C801"))
     For k = 1 To 10
         ca.Range("C5").Value = k
-        Application.Calculate
-        js = js & TopItemJson(k) & IIf(k < 10, ",", "") & vbLf
+        cz = ""
+        For bi = 0 To 2
+            ca.Range("C6").Value = bases(bi)
+            Application.Calculate
+            If bi = 0 Then
+                c0 = CauseJson(ca)
+            Else
+                cz = cz & IIf(bi > 1, ", ", "") & JV(bases(bi)) & ": " & CauseJson(ca)
+            End If
+        Next bi
+        Application.StatusBar = UHex("005400520041004300450020B300C2DCBCF4B4DC0020B0B4BCF4B0B4AE300020") & k & "/10"
+        js = js & TopItemJson(k, c0, "{" & cz & "}") & IIf(k < 10, ",", "") & vbLf
     Next k
+    Application.StatusBar = False
     js = js & "]" & vbLf & "};" & vbLf
     ca.Range("C5").Value = keep5: ca.Range("C6").Value = keep6: ca.Range("C7").Value = keep7: ca.Range("C8").Value = keep8
     Application.Calculate
@@ -108,7 +122,7 @@ Private Function MetaJson() As String
     Set st = ThisWorkbook.Worksheets(UHex("C124C815"))
     MetaJson = "{""company"": " & JV(st.Range("C5").Value) & _
         ", ""period"": " & JV(CStr(st.Range("C6").Value) & "-" & Format(st.Range("C7").Value, "00")) & _
-        ", ""unit"": " & JV(st.Range("C9").Value) & _
+        ", ""unit"": " & JV(st.Range("C9").Value) & ", ""burnMethod"": " & JV(st.Range("C19").Value) & _
         ", ""check"": " & JV(ThisWorkbook.Worksheets(UHex("C790AC00C9C4B2E8")).Range("B4").Value) & _
         ", ""recon"": " & JV(ThisWorkbook.Worksheets(UHex("ACC4C815BCC0B3D9")).Range("P24").Value) & _
         ", ""generated"": " & JV(Format(Now, "yyyy-mm-dd hh:nn")) & "}"
@@ -129,16 +143,33 @@ Private Function RowsJson(ByVal sheetName As String, ByVal firstRow As Long, ByV
     RowsJson = s & "]"
 End Function
 
-Private Function TopItemJson(ByVal k As Long) As String
-    Dim w As Worksheet, ca As Worksheet, r As Long, s As String, wr As Long
+Private Function TopItemJson(ByVal k As Long, ByVal causeJs As String, ByVal causesJs As String) As String
+    Dim w As Worksheet, s As String, wr As Long, j As Long, bk As Variant
     Set w = ThisWorkbook.Worksheets(UHex("C8FCC758B300C0C1"))
-    Set ca = ThisWorkbook.Worksheets(UHex("C6D0C778BD84C11D"))
     wr = 5 + k
     s = "{""rank"": " & k & ", ""dept"": " & JV(w.Cells(wr, 2).Value) & ", ""account"": " & JV(w.Cells(wr, 3).Value) & _
         ", ""cur"": " & JV(w.Cells(wr, 4).Value) & ", ""mom"": " & JV(w.Cells(wr, 5).Value) & ", ""yoy"": " & JV(w.Cells(wr, 6).Value) & _
         ", ""status"": " & JV(w.Cells(wr, 7).Value) & ", ""qrate"": " & JV(w.Cells(wr, 8).Value) & ", ""annual"": " & JV(w.Cells(wr, 9).Value) & _
-        ", ""signal"": " & JV(w.Cells(wr, 10).Value) & ", ""score"": " & JV(w.Cells(wr, 11).Value) & ", ""comment"": " & JV(w.Cells(wr, 13).Value)
-    s = s & ", ""cause"": {""summary"": " & JV(ca.Range("A18").Value) & _
+        ", ""signal"": " & JV(w.Cells(wr, 10).Value) & ", ""score"": " & JV(w.Cells(wr, 11).Value) & ", ""comment"": " & JV(w.Cells(wr, 13).Value) & _
+        ", ""qcur"": " & JV(w.Cells(wr, 15).Value) & ", ""qoq"": " & JV(w.Cells(wr, 16).Value) & ", ""ytd"": " & JV(w.Cells(wr, 17).Value) & ", ""ytdRate"": " & JV(w.Cells(wr, 18).Value) & _
+        ", ""momAmt"": " & JV(w.Cells(wr, 40).Value) & ", ""qoqAmt"": " & JV(w.Cells(wr, 41).Value) & ", ""ytdAmt"": " & JV(w.Cells(wr, 42).Value)
+    ' 고갈 추세 (주의대상 S~AL열)
+    bk = Array("budget", "slope", "icpt", "yearEnd", "tstar", "date", "status", "qdate")
+    s = s & ", ""burn"": {""dept"": " & JV(w.Cells(wr, 2).Value) & ", ""account"": " & JV(w.Cells(wr, 3).Value) & ", ""ytd"": " & JV(w.Cells(wr, 17).Value)
+    For j = 0 To 7
+        s = s & ", """ & bk(j) & """: " & JV(w.Cells(wr, 19 + j).Value)
+    Next j
+    For j = 1 To 12
+        s = s & ", ""c" & j & """: " & JV(w.Cells(wr, 26 + j).Value)
+    Next j
+    s = s & ", ""pySlope"": " & JV(w.Cells(wr, 39).Value)
+    TopItemJson = s & "}, ""cause"": " & causeJs & ", ""causes"": " & causesJs & "}"
+End Function
+
+' 원인분석 시트의 지금 계산 결과 (선택 항목 · 비교 기준 하나)
+Private Function CauseJson(ByVal ca As Worksheet) As String
+    Dim r As Long, s As String
+    s = "{""basis"": " & JV(ca.Range("C6").Value) & ", ""summary"": " & JV(ca.Range("A18").Value) & _
         ", ""curTotal"": " & JV(ca.Range("A16").Value) & ", ""cmpTotal"": " & JV(ca.Range("B16").Value) & ", ""diff"": " & JV(ca.Range("C16").Value) & ", ""candidates"": ["
     For r = 21 To 28
         If ca.Cells(r, 2).Value <> "" Then
@@ -159,7 +190,7 @@ Private Function TopItemJson(ByVal k As Long) As String
                 ", ""vendor"": " & JV(ca.Cells(r, 4).Value) & ", ""text"": " & JV(ca.Cells(r, 5).Value) & ", ""amt"": " & JV(ca.Cells(r, 6).Value) & "}"
         End If
     Next r
-    TopItemJson = s & "]}}"
+    CauseJson = s & "]}"
 End Function
 
 ' 셀 값 → JSON 값
