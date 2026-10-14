@@ -765,7 +765,9 @@ for i in range(15):
         put(kw, r, 7, desc, BLUE)
     else:
         for c in range(1, 8): put(kw, r, c, None, BLUE)
-    put(kw, r, 8, f'=IF($A{r}="","",SUMPRODUCT(MAX(($B{r}:$F{r}<>"")*SUMIFS({JR("P")},{JR("Q")},"당기",{JR("I")},"*"&$B{r}:$F{r}&"*"))))', GREEN, NUM)
+    # 키워드마다 SUMIFS 하나씩 → MAX (SUMIFS 조건에 범위를 넣는 배열 계산은 실제 엑셀에서 0이 됨)
+    kws_ = ",".join(f'IF(${c}{r}="",0,SUMIFS({JR("P")},{JR("Q")},"당기",{JR("I")},"*"&${c}{r}&"*"))' for c in "BCDEF")
+    put(kw, r, 8, f'=IF($A{r}="","",MAX({kws_}))', GREEN, NUM)
     put(kw, r, 9, f'=IF(OR($A{r}="",원인분석!$C$16<=0),"",H{r}/원인분석!$C$16)', GREEN, PCT)
 kw.freeze_panes = "A5"; widths(kw, [16, 9, 9, 9, 9, 9, 52, 12, 10])
 

@@ -8,6 +8,7 @@ TRACE(사업비 원인추적기)는 보험사 예산·사업비 담당자가 내
 - **내부망 실행 환경:** Excel 2016 + VBA(매크로 허용) + HTML(Edge·Chrome). 인터넷 없음.
   - 엑셀 수식은 Excel 2016 함수만: `XLOOKUP`·`FILTER`·`TEXTJOIN`·`IFS`·`MAXIFS`·`LET` 등 금지. `SUMIFS`·`INDEX/MATCH`·`SUMPRODUCT`·`COUNTIFS` 사용. 배열 트릭은 `SUMPRODUCT(MAX(...))`, `INDEX(...,0)`.
   - SUMPRODUCT 배열 안에 `""`(빈 문자열)이 들어가면 `#VALUE!` → 숫자 열은 빈 행에 0을 돌려준다.
+  - **SUMIFS·COUNTIFS 조건에 범위를 넣는 배열 계산(`"*"&$B5:$F5&"*"`) 금지.** formulas 라이브러리는 계산하지만 실제 엑셀은 0을 돌려준다 (2026-10 엑셀 검증에서 발견). 조건마다 SUMIFS를 따로 쓰고 MAX·합계로 묶는다.
   - VBA는 `.bas` 텍스트로 제공하고 **CP949 + CRLF**로 저장 (한국어 Windows에서 가져오기 시 한글 깨짐 방지). 프로시저 이름은 영문.
   - HTML은 외부 CDN·폰트에 의존하지 않는다 (내부망 오프라인). 차트는 직접 그린 SVG. 엑셀 읽기는 `DecompressionStream`으로 직접 ZIP 해제.
 - 저장소 `bicebersa/TRACE`는 **공개**. 예시 데이터는 모두 가상(예시보험㈜).
