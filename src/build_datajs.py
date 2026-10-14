@@ -260,25 +260,32 @@ alloc = [dict(cat=c, cur=catsum(j, P, P), prev=catsum(j, P - 1, P - 1), ytd=cats
 tot_cur = sum(a["cur"] for a in alloc)
 for a in alloc: a["share"] = a["cur"] / tot_cur if tot_cur else 0
 EXPD = {(r[0] * 12 + r[1], r[2]): [x / 1e6 for x in r[4:7]] for r in D["EXP"]}
-def target(model, cat):
-    if cat == "신계약비" and model in ("GMM", "VFA"): return f"CSM 조정 ({model})"
-    if cat == "신계약비": return "당기손익"
-    return "당기손익(보험서비스결과)"
+# IFRS 17 반영 정책 (엑셀 계정대체기준 3번 표 H·I열, 4번 표와 같음)
+PF_LINK = {"PF01": 0.6, "PF02": 0.6, "PF03": 0.0, "PF04": 0.6}; PF_ONEROUS = {"PF01": "N", "PF02": "N", "PF03": "N", "PF04": "N"}
+NB_POLICY = os.environ.get("NB_POLICY", "보험료연동분만 CSM"); PAA_POLICY = "발생 즉시 비용"
+def split(pf, mdl, cat, diff):   # (반영처, CSM 반영, 당기손익 반영) — IFRS17_사업비 H~J열
+    if cat != "신계약비": return "당기손익(보험서비스결과)", 0.0, diff
+    if mdl == "PAA": return ("잔여보장부채 이연(상각)", 0.0, 0.0) if PAA_POLICY == "이연 후 상각" else ("당기손익", 0.0, diff)
+    if PF_ONEROUS[pf] == "Y": return "당기손익(손실요소)", 0.0, diff
+    lk = 1.0 if NB_POLICY == "전액 CSM" else 0.0 if NB_POLICY == "전액 당기손익" else PF_LINK[pf]
+    t = f"CSM 조정 ({mdl})" if lk >= 1 else "당기손익" if lk <= 0 else f"CSM {lk:.0%} ({mdl}) · 나머지 손익"
+    return t, diff * lk, diff - diff * lk
 pfrows = []
 for pf, pfn, mdl in PFS:
     for j, cat in enumerate(CATS[1:4]):
         act = alloc[j + 1]["cur"] * PF_DRV[pf][j]; exp_ = EXPD[(P, pf)][j]
-        pfrows.append(dict(pf=pf, name=pfn, model=mdl, cat=cat, actual=act, expected=exp_, diff=exp_ - act, target=target(mdl, cat)))
-tcsm = sum(r["diff"] for r in pfrows if r["target"] == "CSM 조정 (GMM)")
-tvfa = sum(r["diff"] for r in pfrows if r["target"] == "CSM 조정 (VFA)")
-tpl = sum(r["diff"] for r in pfrows if r["target"].startswith("당기손익"))
+        t, c_, l_ = split(pf, mdl, cat, exp_ - act)
+        pfrows.append(dict(pf=pf, name=pfn, model=mdl, cat=cat, actual=act, expected=exp_, diff=exp_ - act, target=t, csm=c_, pl=l_))
+tcsm = sum(r["csm"] for r in pfrows if r["model"] == "GMM")
+tvfa = sum(r["csm"] for r in pfrows if r["model"] == "VFA")
+tpl = sum(r["pl"] for r in pfrows)
 ROLLP = [r for r in D["ROLL"] if r[0] * 12 + r[1] == P]
 recon = []
 for pf, pfn, mdl in PFS:
     act = sum(r[9] for r in ROLLP if r[2] == pf and r[5] == "F31") / 1e6
-    tr = 0 if mdl == "PAA" else sum(r["diff"] for r in pfrows if r["pf"] == pf and r["cat"] == "신계약비")
+    tr = 0 if mdl == "PAA" else sum(r["csm"] for r in pfrows if r["pf"] == pf and r["cat"] == "신계약비")
     recon.append(dict(pf=pf, model=mdl, actuary=act, trace=tr, diff=act - tr, status="해당없음 (CSM 없음)" if mdl == "PAA" else ("일치" if abs(act - tr) < 0.5 else "차이 확인")))
-FACN = [("F00", "기초잔액"), ("F10", "신계약 효과"), ("F21", "가정변경-사업비"), ("F22", "가정변경-기타"), ("F31", "경험조정-신계약비"),
+FACN = [("F00", "기초잔액"), ("F10", "신계약 효과"), ("F21", "가정변경-사업비"), ("F22", "가정변경-기타"), ("F31", "경험조정-취득현금흐름"),
         ("F32", "경험조정-보험료 등"), ("F40", "보험금융비용(이자부리)"), ("F51", "CSM 상각"), ("F52", "RA 해제"), ("F60", "현금흐름 및 기타"), ("F99", "기말잔액")]
 def mkbridge(mdl):
     return [dict(code=c, name=n, bel=sum(r[7] for r in ROLLP if r[5] == c and r[4] == mdl) / 1e6, ra=sum(r[8] for r in ROLLP if r[5] == c and r[4] == mdl) / 1e6,
@@ -300,7 +307,7 @@ def sg(x, d=1):
     if v == 0: return "0"
     return ("+" if v > 0 else "-") + f"{abs(v):,.{d}f}"
 nbt = sum(r["diff"] for r in pfrows if r["cat"] == "신계약비")
-summary17 = (f"GMM CSM 당월 변동 {sg(csm_chg, 0)} 중 사업비 관련 {sg(csm_exp)} (신계약비 경험조정 {sg(bmap['F31']['csm'])}, 사업비 가정변경 {sg(bmap['F21']['csm'])}). "
+summary17 = (f"GMM CSM 당월 변동 {sg(csm_chg, 0)} 중 사업비 관련 {sg(csm_exp)} (취득현금흐름 경험조정 {sg(bmap['F31']['csm'])}, 사업비 가정변경 {sg(bmap['F21']['csm'])}). "
              f"신계약비 실제가 예정보다 {abs(nbt):,.1f}{' 많았고' if nbt < 0 else ' 적었고'}"
              + (f", 증가 기여 1위는 {drivers[0]['dept']} {drivers[0]['account']} ({sg(drivers[0]['diff'])})" if drivers else "")
              + (f", 대표 전표는 {evidence17[0]['vendor']} '{evidence17[0]['text']}' {evidence17[0]['nb']:,.1f}" if evidence17 else "")

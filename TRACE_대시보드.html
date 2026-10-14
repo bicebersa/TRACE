@@ -509,7 +509,8 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
     var pfRows = pfIds.map(function (id) {
       var rs = X.pf.filter(function (r) { return r.pf === id; }), r0 = rs[0];
       return '<tr><td><b>' + esc(r0.name) + '</b><br><span class="sig">' + esc(id) + ' · ' + esc(r0.model) + '</span></td>' + rs.map(function (r) {
-        return '<td class="r ' + (r.diff < 0 ? "up" : "") + '">' + (r.diff > 0 ? "+" : "") + fmt(r.diff, 1) + '<br><span class="tgt ' + tcls(r.target) + '">' + esc(r.target.replace("(보험서비스결과)", "")) + '</span></td>';
+        var split = (r.csm !== undefined && r.csm !== null && Math.abs(+r.csm) > 0.05 && Math.abs(+r.pl || 0) > 0.05) ? '<br><span class="amt">CSM ' + samt(+r.csm) + ' · 손익 ' + samt(+r.pl) + '</span>' : '';
+        return '<td class="r ' + (r.diff < 0 ? "up" : "") + '">' + (r.diff > 0 ? "+" : "") + fmt(r.diff, 1) + '<br><span class="tgt ' + tcls(r.target) + '">' + esc(r.target.replace("(보험서비스결과)", "").replace(" · 나머지 손익", "")) + '</span>' + split + '</td>';
       }).join("") + '</tr>';
     }).join("");
     var acol = { "비귀속": "var(--prev)", "신계약비": "var(--csm)", "유지비": "var(--accent)", "수금비": "var(--budget)" };
@@ -524,18 +525,18 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
     var rec = X.recon.map(function (r) {
       return '<tr><td>' + esc(r.pf) + ' <span class="sig">' + esc(r.model) + '</span></td><td class="r">' + fmt(r.actuary, 1) + '</td><td class="r">' + fmt(r.trace, 1) + '</td><td><span class="pill ' + (r.status === "일치" ? "여유" : r.status === "차이 확인" ? "부족" : "참고") + '">' + esc(r.status) + '</span></td></tr>';
     }).join("");
-    app.appendChild(el('<section data-tab="ifrs17"><div class="sec-head"><span class="eyebrow">IFRS 17 · GMM · VFA · PAA</span><h2>사업비가 CSM·손익에 준 영향</h2><span class="muted">계정대체 → 포트폴리오 → 예정 대비 경험차이 · GMM·VFA 신계약비 차이는 CSM, 유지·수금비 차이는 당기손익</span></div>' +
+    app.appendChild(el('<section data-tab="ifrs17"><div class="sec-head"><span class="eyebrow">IFRS 17 · GMM · VFA · PAA</span><h2>사업비가 CSM·손익에 준 영향</h2><span class="muted">계정대체 → 포트폴리오 → 예상 대비 경험차이 · 신계약비 차이 중 보험료 연동분은 CSM(GMM·VFA, B96(a)), 나머지와 유지·수금비 차이는 당기손익(B97(c))</span></div>' +
       '<p class="summary17">' + esc(X.summary) + '</p><div class="grid2">' +
       '<div class="card"><div class="card-head"><h3>CSM 변동 요인 (당월)</h3><span class="seg" role="group" aria-label="측정모형"><button type="button" data-m="gmm" aria-pressed="true">GMM</button>' + (wfv ? '<button type="button" data-m="vfa" aria-pressed="false">VFA</button>' : '') + '</span></div>' +
       '<div class="legend"><span><i style="background:var(--csm)"></i>사업비 관련</span><span><i style="background:var(--accent)"></i>증가</span><span><i style="background:var(--crit)"></i>감소</span></div>' +
       '<div data-m="gmm">' + wf + '<p class="muted" style="font-size:12px;margin:0">GMM CSM 순변동 ' + (X.csmChange > 0 ? "+" : "") + fmt(X.csmChange, 0) + ' 중 사업비 관련 ' + (X.csmExpense > 0 ? "+" : "") + fmt(X.csmExpense, 1) + '</p></div>' +
       (wfv ? '<div data-m="vfa" hidden>' + wfv + '<p class="muted" style="font-size:12px;margin:0">VFA CSM 순변동 ' + (X.csmChangeVfa > 0 ? "+" : "") + fmt(X.csmChangeVfa, 0) + ' 중 사업비 관련 ' + (X.csmExpenseVfa > 0 ? "+" : "") + fmt(X.csmExpenseVfa, 1) + '</p></div>' : '') + '</div>' +
-      '<div class="card"><div class="card-head"><h3>포트폴리오별 경험차이 (예정 − 실제)</h3></div><div class="tbl-wrap"><table><thead><tr><th>포트폴리오</th><th class="r">신계약비</th><th class="r">유지비</th><th class="r">수금비</th></tr></thead><tbody>' + pfRows + '</tbody></table></div>' +
+      '<div class="card"><div class="card-head"><h3>포트폴리오별 경험차이 (예상 − 실제)</h3></div><div class="tbl-wrap"><table><thead><tr><th>포트폴리오</th><th class="r">신계약비</th><th class="r">유지비</th><th class="r">수금비</th></tr></thead><tbody>' + pfRows + '</tbody></table></div>' +
       '<div class="legend"><span>CSM 조정 GMM <b class="num">' + fmt(X.totals.csm, 1) + '</b></span>' + (X.totals.csmVfa !== undefined ? '<span>CSM 조정 VFA <b class="num">' + fmt(X.totals.csmVfa, 1) + '</b></span>' : '') + '<span>당기손익 <b class="num">' + fmt(X.totals.pl, 1) + '</b></span></div></div>' +
       '<div class="card"><div class="card-head"><h3>당월 사업비 배분</h3></div><div class="stack">' + stack + '</div><div class="legend" style="gap:8px 16px">' + allocLeg + '</div>' +
       '<h3 style="margin-top:6px">신계약비 증가 기여 (전월 대비)</h3><div class="tbl-wrap"><table><thead><tr><th>부서 · 계정</th><th class="r">당월</th><th class="r">전월</th><th class="r">증감</th></tr></thead><tbody>' + drv + '</tbody></table></div></div>' +
       '<div class="card"><div class="card-head"><h3>근거 전표 (귀속 신계약비 큰 순)</h3></div><div class="tbl-wrap"><table><thead><tr><th>일자</th><th>거래처</th><th>적요</th><th class="r">신계약 귀속</th></tr></thead><tbody>' + ev17 + '</tbody></table></div>' +
-      '<h3 style="margin-top:6px">변동표 대사 (계리 F31 vs TRACE)</h3><div class="tbl-wrap"><table><thead><tr><th>포트폴리오</th><th class="r">계리</th><th class="r">TRACE</th><th>판정</th></tr></thead><tbody>' + rec + '</tbody></table></div></div>' +
+      '<h3 style="margin-top:6px">변동표 대사 (계리 F31 vs TRACE CSM 반영분)</h3><div class="tbl-wrap"><table><thead><tr><th>포트폴리오</th><th class="r">계리</th><th class="r">TRACE</th><th>판정</th></tr></thead><tbody>' + rec + '</tbody></table></div></div>' +
       '</div></section>'));
   }
 

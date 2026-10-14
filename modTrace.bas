@@ -106,7 +106,7 @@ Private Function Ifrs17Json() As String
     Set ia = ThisWorkbook.Worksheets(UHex("004900460052005300310037005FC0ACC5C5BE44"))
     Ifrs17Json = "{""summary"": " & JV(ia.Range("A5").Value) & _
         ", ""alloc"": " & RowsJson(UHex("004900460052005300310037005FC0ACC5C5BE44"), 10, 5, Array("cat", "cur", "prev", "ytd", "share")) & _
-        ", ""pf"": " & RowsJson(UHex("004900460052005300310037005FC0ACC5C5BE44"), 20, 12, Array("pf", "name", "model", "cat", "actual", "expected", "diff", "target")) & _
+        ", ""pf"": " & RowsJson(UHex("004900460052005300310037005FC0ACC5C5BE44"), 20, 12, Array("pf", "name", "model", "cat", "actual", "expected", "diff", "target", "csm", "pl")) & _
         ", ""totals"": {""csm"": " & JV(ia.Range("G32").Value) & ", ""csmVfa"": " & JV(ia.Range("G33").Value) & ", ""pl"": " & JV(ia.Range("G34").Value) & "}" & _
         ", ""recon"": " & RowsJson(UHex("004900460052005300310037005FC0ACC5C5BE44"), 39, 4, Array("pf", "model", "actuary", "trace", "diff", "status")) & _
         ", ""bridge"": " & RowsJson(UHex("004900460052005300310037005FC0ACC5C5BE44"), 46, 11, Array("code", "name", "bel", "ra", "csm", "expense")) & _

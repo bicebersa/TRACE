@@ -327,7 +327,7 @@ sec(ws, r, "한계와 전제"); r += 1
 for ln in ["원인분석은 한 번에 한 항목씩 계산합니다. TOP 10 전체 원인을 리포트에 자동으로 채우는 기능은 VBA로 추가 예정입니다.",
            "변동분석의 부서·계정 목록은 고정입니다. 새 조합이 생기면 자가진단이 알려주며, 행을 직접 추가해야 합니다 (VBA 버전에서 자동).",
            "원인 후보는 규칙 기반 가설입니다. 반드시 근거 전표와 담당 부서 확인으로 확정하세요.",
-           "IFRS 17 연결은 계정대체 규칙과 포트폴리오 비율로 전표를 나눈 추정입니다. 계리 변동표(경험조정-신계약비)와 대사해 확인하세요. 측정모형별 처리는 회사 회계정책을 따릅니다.",
+           "IFRS 17 연결은 계정대체 규칙과 포트폴리오 비율로 전표를 나눈 추정입니다. 계리 변동표(경험조정-취득현금흐름)와 대사해 확인하세요. 측정모형별 처리는 회사 회계정책을 따릅니다.",
            "포트폴리오: GMM(보장성·저축성)과 VFA(변액)는 신계약비 차이가 CSM을 조정하고 유지·수금비 차이는 당기손익, PAA(단체)는 손익 영향만 봅니다. 변액은 특별계정 구분계리 대상이지만 손익에 영향을 주므로 분석에 포함합니다."]:
     ws.cell(row=r, column=1, value=ln).font = F(); r += 1
 widths(ws, [18, 60, 62])
@@ -1092,6 +1092,11 @@ INV_DEPTS = ["D950"]; INV_RATE = {2025: 0.65, 2026: 0.70}           # 투자관�
 CC2DEPT = {c[0]: c[2] for c in CCS}
 PFS = [("PF01", "보장성", "GMM"), ("PF02", "저축성", "GMM"), ("PF03", "단체(단기)", "PAA"), ("PF04", "변액", "VFA")]
 PF_DRV = {"PF01": (.55, .50, .50), "PF02": (.20, .30, .30), "PF03": (.10, .08, .08), "PF04": (.15, .12, .12)}  # (신계약, 유지, 수금)
+# IFRS 17 반영 정책 (예시값 · 회사 회계정책으로 바꿈). B96(a): 보험료 연동 취득현금흐름의 예실차만 CSM, 나머지는 B97(c)로 당기손익
+PF_LINK = {"PF01": 0.6, "PF02": 0.6, "PF03": 0.0, "PF04": 0.6}   # 신계약비 중 보험료에 연동되는 비율 (예: 보험료 비례 수수료)
+PF_ONEROUS = {"PF01": "N", "PF02": "N", "PF03": "N", "PF04": "N"}   # 손실부담 집단이면 Y → 미래 서비스 관련 변동도 손실요소·당기손익
+NB_POLICY = os.environ.get("NB_POLICY", "보험료연동분만 CSM")        # 보험료연동분만 CSM / 전액 CSM / 전액 당기손익
+PAA_POLICY = "발생 즉시 비용"                                        # 발생 즉시 비용(59(a)) / 이연 후 상각
 def alloc_of(e):   # → [비귀속, 신계약, 유지, 수금, 재산관리비] 비율
     if e["gl"] in DIRECT:
         return [1.0 if DIRECT[e["gl"]] == c else 0.0 for c in ("비귀속", "신계약비", "유지비", "수금비")] + [0.0]
@@ -1148,7 +1153,7 @@ for i, (y, m) in enumerate(MONTHS):
         cum[code] = cum.get(code, 0) + p[code]
         PLROWS.append([y, m, code, nm, cls, lv, p[code], cum[code]])
 
-FAC = [("F00", "기초잔액"), ("F10", "신계약 효과"), ("F21", "가정변경-사업비"), ("F22", "가정변경-기타"), ("F31", "경험조정-신계약비"),
+FAC = [("F00", "기초잔액"), ("F10", "신계약 효과"), ("F21", "가정변경-사업비"), ("F22", "가정변경-기타"), ("F31", "경험조정-취득현금흐름"),
        ("F32", "경험조정-보험료 등"), ("F40", "보험금융비용(이자부리)"), ("F51", "CSM 상각"), ("F52", "RA 해제"), ("F60", "현금흐름 및 기타"), ("F99", "기말잔액")]
 SH = {"BEL": {"PF01": .50, "PF02": .33, "PF03": .02, "PF04": .15}, "RA": {"PF01": .60, "PF02": .25, "PF03": .02, "PF04": .13},
       "CSM": {"PF01": .62 / .87 * .87, "PF02": .25, "PF03": 0, "PF04": .13}}
@@ -1172,7 +1177,7 @@ for (y, m) in MONTHS:
             a21 = -1200 if (pf == "PF01" and (y, m) == (2026, 9)) else (400 if (pf == "PF01" and (y, m) == (2025, 12)) else (-250 if (pf == "PF02" and (y, m) == (2025, 12)) else 0))
             f["F21"] = [-a21, 0, a21]
             act_nb = ATT[(y, m)][1] / MIL * PF_DRV[pf][0]
-            f["F31"] = [0, 0, EXPV[(y, m, pf)] - act_nb]
+            f["F31"] = [0, 0, (EXPV[(y, m, pf)] - act_nb) * (1.0 if NB_POLICY == "전액 CSM" else 0.0 if NB_POLICY == "전액 당기손익" else PF_LINK[pf]) * (PF_ONEROUS[pf] != "Y")]
             f["F32"] = [0, 0, frng.uniform(-300, 300)]
             f["F40"] = [b0 * 0.0025, r0 * 0.002, c0 * 0.0025]
             f["F51"] = [0, 0, -c0 * 0.009]
@@ -1419,7 +1424,7 @@ for i in range(30):
     put(ab, r, 7, f'=IF($A{r}="",0,SUM(C{r}:F{r}))', fmt=PCT)
 ab.cell(row=50, column=1, value="표에 없는 부서의 공통비는 전액 비귀속으로 처리하고 자가진단이 알려줍니다.").font = F(GRAY, size=9)
 sec(ab, 52, "3. 상품·계약집단 귀속 드라이버 (상품·증권번호별 귀속 결과를 받기 전까지 포트폴리오 비율로 대신)")
-header(ab, 53, ["포트폴리오", "포트폴리오명", "측정모형", "신계약비\n(신계약 건수)", "유지비\n(보유계약)", "수금비\n(수입보험료)", "비고"], h=32)
+header(ab, 53, ["포트폴리오", "포트폴리오명", "측정모형", "신계약비\n(신계약 건수)", "유지비\n(보유계약)", "수금비\n(수입보험료)", "비고", "보험료 연동\n비율(신계약비)", "손실부담\n(Y/N)"], h=32)
 for i in range(10):
     r = 54 + i
     if i < len(PFS):
@@ -1427,12 +1432,28 @@ for i in range(10):
         put(ab, r, 1, pf, BLUE, align="center"); put(ab, r, 2, pfn, BLUE); put(ab, r, 3, mdl, BLUE, align="center")
         for j, v in enumerate(PF_DRV[pf]): put(ab, r, 4 + j, v, BLUE, PCT, fill=YEL)
         put(ab, r, 7, "변액 · 특별계정 (CSM 조정 · 손익 영향 분석 포함)" if mdl == "VFA" else ("CSM 없음 · 손익 반영" if mdl == "PAA" else "분석 대상"), GRAY)
+        put(ab, r, 8, PF_LINK[pf], BLUE, PCT, fill=YEL); put(ab, r, 9, PF_ONEROUS[pf], BLUE, fill=YEL, align="center")
     else:
-        for c in range(1, 8): put(ab, r, c, None, BLUE, PCT if 4 <= c <= 6 else None)
+        for c in range(1, 10): put(ab, r, c, None, BLUE, PCT if (4 <= c <= 6 or c == 8) else None)
 put(ab, 64, 3, "합계", bold=True, fill=TOT)
 for c in (4, 5, 6): put(ab, 64, c, f"=SUM({CL(c)}54:{CL(c)}63)", fmt=PCT, bold=True, fill=TOT)
 dv = DataValidation(type="list", formula1='"GMM,PAA,VFA"'); ab.add_data_validation(dv); dv.add("C54:C63")
-widths(ab, [13, 18, 10, 12, 14, 12, 34]); ab.freeze_panes = "A4"
+dv = DataValidation(type="list", formula1='"Y,N"'); ab.add_data_validation(dv); dv.add("I54:I63")
+sec(ab, 66, "4. IFRS 17 반영 정책 (회사 회계정책에 맞춰 고름 · K-IFRS 1117)")
+for rr, k, v, opts, d in [(67, "신계약비 예실차 반영처", NB_POLICY, "보험료연동분만 CSM,전액 CSM,전액 당기손익",
+                           "B96(a): 당기 보험료 중 미래 서비스 관련분과 연동된 취득현금흐름(예: 보험료 비례 수수료)의 예실차만 CSM. 나머지 경험조정은 B97(c)로 당기손익. 비율은 3번 표 H열"),
+                          (68, "PAA 보험취득현금흐름", PAA_POLICY, "발생 즉시 비용,이연 후 상각",
+                           "59(a): 보장기간 1년 이하면 발생 즉시 비용 선택 가능. 이연이면 잔여보장부채에서 상각(경험차이도 당기에 바로 손익이 되지 않음)")]:
+    put(ab, rr, 1, k, bold=True, fill=SUB); ab.merge_cells(start_row=rr, start_column=1, end_row=rr, end_column=2)
+    put(ab, rr, 3, v, BLUE, fill=YEL, align="center"); ab.merge_cells(start_row=rr, start_column=3, end_row=rr, end_column=4)
+    put(ab, rr, 5, d, GRAY); ab.merge_cells(start_row=rr, start_column=5, end_row=rr, end_column=9)
+    dv = DataValidation(type="list", formula1=f'"{opts}"'); ab.add_data_validation(dv); dv.add(f"C{rr}")
+for k_, ln in enumerate(["· 당기 신계약의 취득현금흐름은 경험조정이 아니라 최초 측정(38항, 신계약 효과 F10)에 들어갑니다. 변동표 F31과 대사할 때 회사 변동표의 정의를 확인하세요.",
+                         "· 손실부담 집단(Y)은 미래 서비스 관련 변동도 CSM이 아닌 손실요소·당기손익으로 갑니다 (44(c), 48·50항).",
+                         "· 집단 인식 전에 지급한 취득현금흐름은 '보험취득현금흐름 자산'(28B~28F)으로 따로 관리하며 TRACE 범위 밖입니다.",
+                         "· VFA의 투자 관련 서비스 원가, GMM의 투자수익 서비스 원가는 이행현금흐름에 포함될 수 있습니다 (B65(ka)). 1번 표 재산관리비 대체 대상인지 확인하세요."]):
+    ab.cell(row=70 + k_, column=1, value=ln).font = F(GRAY, size=9)
+widths(ab, [13, 18, 10, 12, 14, 12, 34, 12, 9]); ab.freeze_panes = "A4"
 
 # ---------- 예정사업비 (입력)
 EX_HDR = ["회계연도", "기간", "포트폴리오", "포트폴리오명", "신계약비", "유지비", "수금비"]
@@ -1491,7 +1512,8 @@ put(ia, A0 + 6, 5, f"=SUM(E{A0+1}:E{A0+5})", fmt=PCT1, bold=True, fill=TOT)
 ia.cell(row=A0 + 7, column=1, value="재산관리비는 IFRS 17 이행현금흐름 밖 (PL 투자손익에서 차감) · 비귀속은 기타사업비용").font = F(GRAY, size=9)
 B0 = A0 + 10  # 2. 포트폴리오별 경험차이
 sec(ia, B0 - 1, "2. 포트폴리오별 경험차이 (당월, 예정 − 실제 · 음수 = 불리)")
-header(ia, B0, ["포트폴리오", "포트폴리오명", "측정모형", "구분", "실제", "예정", "경험차이", "반영처"], h=20)
+header(ia, B0, ["포트폴리오", "포트폴리오명", "측정모형", "구분", "실제", "예정", "경험차이", "반영처", "CSM 반영", "당기손익 반영"], h=20)
+NBP, PAAP = "계정대체기준!$C$67", "계정대체기준!$C$68"
 PFR = lambda col: f"계정대체기준!${col}$54:${col}$63"
 rows_b = []
 for i, (pf, pfn, mdl) in enumerate(PFS):
@@ -1504,26 +1526,33 @@ for i, (pf, pfn, mdl) in enumerate(PFS):
         put(ia, r, 5, f'=$B${A0+2+j}*IFERROR(INDEX({PFR(drvcol)},MATCH($A{r},{PFR("A")},0)),0)', GREEN, NUM)
         put(ia, r, 6, f'=SUMIFS({EXR(excol)},{EXR("I")},{S["P"]},{EXR("C")},$A{r})', GREEN, NUM)
         put(ia, r, 7, f"=F{r}-E{r}", fmt='+#,##0.0;-#,##0.0;"-"', bold=True)
-        put(ia, r, 8, f'=IF(AND(D{r}="신계약비",OR(C{r}="GMM",C{r}="VFA")),"CSM 조정 ("&C{r}&")",IF(D{r}="신계약비","당기손익","당기손익(보험서비스결과)"))', align="center")
+        lk = f'IF({NBP}="전액 CSM",1,IF({NBP}="전액 당기손익",0,IFERROR(INDEX({PFR("H")},MATCH($A{r},{PFR("A")},0)),0)))'
+        on = f'(IFERROR(INDEX({PFR("I")},MATCH($A{r},{PFR("A")},0)),"N")="Y")'
+        csm_ok = f'AND(D{r}="신계약비",OR(C{r}="GMM",C{r}="VFA"),NOT({on}))'
+        put(ia, r, 9, f'=IF({csm_ok},G{r}*{lk},0)', fmt='+#,##0.0;-#,##0.0;"-"')
+        put(ia, r, 10, f'=IF(AND(D{r}="신계약비",C{r}="PAA",{PAAP}="이연 후 상각"),0,G{r}-I{r})', fmt='+#,##0.0;-#,##0.0;"-"')
+        put(ia, r, 8, f'=IF(D{r}<>"신계약비","당기손익(보험서비스결과)",IF(C{r}="PAA",IF({PAAP}="이연 후 상각","잔여보장부채 이연(상각)","당기손익"),'
+                      f'IF({on},"당기손익(손실요소)",IF({lk}>=1,"CSM 조정 ("&C{r}&")",IF({lk}<=0,"당기손익","CSM "&TEXT({lk},"0%")&" ("&C{r}&") · 나머지 손익")))))', align="center")
 B1 = rows_b[-1]
 BT = B1 + 1
-for k, (lab, crit) in enumerate((("CSM 조정 (GMM 신계약비)", '"CSM 조정 (GMM)"'), ("CSM 조정 (VFA 신계약비)", '"CSM 조정 (VFA)"'), ("당기손익 (유지·수금, PAA 신계약비)", '"당기손익*"'))):
+for k, (lab, f_) in enumerate((("CSM 조정 (GMM 취득현금흐름 예실차)", f'=SUMIFS($I${B0+1}:$I${B1},$C${B0+1}:$C${B1},"GMM")'),
+                                ("CSM 조정 (VFA 취득현금흐름 예실차)", f'=SUMIFS($I${B0+1}:$I${B1},$C${B0+1}:$C${B1},"VFA")'),
+                                ("당기손익 (유지·수금, 연동 외 신계약비, PAA)", f"=SUM($J${B0+1}:$J${B1})"))):
     r = BT + k
     put(ia, r, 1, lab, bold=True, fill=TOT); ia.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
-    put(ia, r, 7, f"=SUMIFS($G${B0+1}:$G${B1},$H${B0+1}:$H${B1},{crit})", fmt='+#,##0.0;-#,##0.0;"-"', bold=True, fill=TOT)
-    put(ia, r, 8, None, fill=TOT)
-for val, fill in (('"CSM 조정 (GMM)"', "E3EBF7"), ('"CSM 조정 (VFA)"', "E8E3F3")):
-    ia.conditional_formatting.add(f"H{B0+1}:H{B1}", CellIsRule(operator="equal", formula=[val], fill=PatternFill("solid", fgColor=fill)))
+    put(ia, r, 7, f_, fmt='+#,##0.0;-#,##0.0;"-"', bold=True, fill=TOT)
+    for c in (8, 9, 10): put(ia, r, c, None, fill=TOT)
+ia.conditional_formatting.add(f"H{B0+1}:H{B1}", FormulaRule(formula=[f'LEFT(H{B0+1},3)="CSM"'], fill=PatternFill("solid", fgColor="E3EBF7")))
 ia.conditional_formatting.add(f"G{B0+1}:G{B1}", CellIsRule(operator="lessThan", formula=["0"], font=Font(color="C00000", bold=True)))
 C0_ = BT + 6  # 3. 변동표 대사
-sec(ia, C0_ - 1, "3. 변동표 대사 (계리 결과 '경험조정-신계약비' CSM vs TRACE 추정)")
-header(ia, C0_, ["포트폴리오", "측정모형", "계리 F31 (CSM)", "TRACE 추정", "차이", "판정"], h=20)
+sec(ia, C0_ - 1, "3. 변동표 대사 (계리 결과 '경험조정-취득현금흐름' CSM vs TRACE CSM 반영분)")
+header(ia, C0_, ["포트폴리오", "측정모형", "계리 F31 (CSM)", "TRACE 추정\n(CSM 반영분)", "차이", "판정"], h=30)
 for i, (pf, pfn, mdl) in enumerate(PFS):
     r = C0_ + 1 + i
     put(ia, r, 1, pf, BLUE, align="center")
     put(ia, r, 2, f'=IFERROR(INDEX({PFR("C")},MATCH($A{r},{PFR("A")},0)),"")', GREEN, align="center")
     put(ia, r, 3, f'=SUMIFS({RFR("O")},{RFR("L")},{S["P"]},{RFR("C")},$A{r},{RFR("P")},"F31")', GREEN, NUM)
-    put(ia, r, 4, f'=IF(B{r}="PAA",0,SUMIFS($G${B0+1}:$G${B1},$A${B0+1}:$A${B1},$A{r},$D${B0+1}:$D${B1},"신계약비"))', fmt=NUM)
+    put(ia, r, 4, f'=IF(B{r}="PAA",0,SUMIFS($I${B0+1}:$I${B1},$A${B0+1}:$A${B1},$A{r},$D${B0+1}:$D${B1},"신계약비"))', fmt=NUM)
     put(ia, r, 5, f"=C{r}-D{r}", fmt=NUM)
     put(ia, r, 6, f'=IF(B{r}="PAA","해당없음 (CSM 없음)",IF(ABS(E{r})<0.5,"일치","차이 확인"))', align="center")
 C1_ = C0_ + len(PFS)
@@ -1581,7 +1610,7 @@ for k in range(1, 11):
         put(ia, r, c, f'=IF($K{r}="","",INDEX({JR(src)},$K{r}))', GREEN, fmt, align="center" if c in (1, 3, 4) else None)
 nb_tot = f"SUMIFS($G${B0+1}:$G${B1},$D${B0+1}:$D${B1},\"신계약비\")"
 ia[f"A{SUMR}"] = (f'="GMM CSM 당월 변동 "&TEXT(E{D1+1},"+#,##0;-#,##0;0")&" 중 사업비 관련 "&TEXT(E{D1+2},"+#,##0.0;-#,##0.0;0")'
-                  f'&" (신계약비 경험조정 "&TEXT(E{R31},"+#,##0.0;-#,##0.0;0")&", 사업비 가정변경 "&TEXT(E{R21},"+#,##0.0;-#,##0.0;0")&"). "'
+                  f'&" (취득현금흐름 경험조정 "&TEXT(E{R31},"+#,##0.0;-#,##0.0;0")&", 사업비 가정변경 "&TEXT(E{R21},"+#,##0.0;-#,##0.0;0")&"). "'
                   f'&"신계약비 실제가 예정보다 "&TEXT(ABS({nb_tot}),"#,##0.0")&IF({nb_tot}<0," 많았고"," 적었고")'
                   f'&IF(B{E0+1}="","",", 증가 기여 1위는 "&B{E0+1}&" "&C{E0+1}&" ("&TEXT(F{E0+1},"+#,##0.0;-#,##0.0;0")&")")'
                   f'&IF(B{F0+1}="","",", 대표 전표는 "&E{F0+1}&" \'"&F{F0+1}&"\' "&TEXT(H{F0+1},"#,##0.0"))&". "'

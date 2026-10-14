@@ -112,7 +112,7 @@ Private Function Ifrs17Json() As String
     Set ia = ThisWorkbook.Worksheets("IFRS17_사업비")
     Ifrs17Json = "{""summary"": " & JV(ia.Range("A{SUMR}").Value) & _
         ", ""alloc"": " & RowsJson("IFRS17_사업비", {A01}, 5, Array("cat", "cur", "prev", "ytd", "share")) & _
-        ", ""pf"": " & RowsJson("IFRS17_사업비", {B01}, {NPF}, Array("pf", "name", "model", "cat", "actual", "expected", "diff", "target")) & _
+        ", ""pf"": " & RowsJson("IFRS17_사업비", {B01}, {NPF}, Array("pf", "name", "model", "cat", "actual", "expected", "diff", "target", "csm", "pl")) & _
         ", ""totals"": {""csm"": " & JV(ia.Range("G{BT}").Value) & ", ""csmVfa"": " & JV(ia.Range("G{BT1}").Value) & ", ""pl"": " & JV(ia.Range("G{BT2}").Value) & "}" & _
         ", ""recon"": " & RowsJson("IFRS17_사업비", {C01}, {NREC}, Array("pf", "model", "actuary", "trace", "diff", "status")) & _
         ", ""bridge"": " & RowsJson("IFRS17_사업비", {D01}, {NFAC}, Array("code", "name", "bel", "ra", "csm", "expense")) & _

@@ -18,16 +18,16 @@ window.TRACE_DATA = {
   },
   {
    "label": "자본총계",
-   "value": 357643.269,
-   "compare": 342430.399,
-   "rate": 0.0444,
+   "value": 357224.684,
+   "compare": 342422.389,
+   "rate": 0.0432,
    "basis": "전년동월말"
   },
   {
    "label": "보험계약마진(CSM)",
-   "value": 406991.931,
-   "compare": 390749.701,
-   "rate": 0.0416,
+   "value": 407410.516,
+   "compare": 390757.711,
+   "rate": 0.0426,
    "basis": "전년동월말"
   },
   {
@@ -477,108 +477,108 @@ window.TRACE_DATA = {
    "p": 24310,
    "period": "2025-10",
    "assets": 3070423.0,
-   "liabilities": 2727059.037,
-   "equity": 343363.963,
-   "csm": 392364.337,
+   "liabilities": 2727067.228,
+   "equity": 343355.772,
+   "csm": 392372.528,
    "invested": 2857546.5
   },
   {
    "p": 24311,
    "period": "2025-11",
    "assets": 3076478.5,
-   "liabilities": 2745831.88,
-   "equity": 330646.62,
-   "csm": 393840.58,
+   "liabilities": 2745843.172,
+   "equity": 330635.328,
+   "csm": 393851.872,
    "invested": 2863784.3
   },
   {
    "p": 24312,
    "period": "2025-12",
    "assets": 3088482.7,
-   "liabilities": 2742784.05,
-   "equity": 345698.65,
-   "csm": 395154.45,
+   "liabilities": 2742792.258,
+   "equity": 345690.442,
+   "csm": 395162.658,
    "invested": 2876183.7
   },
   {
    "p": 24313,
    "period": "2026-01",
    "assets": 3110168.1,
-   "liabilities": 2758225.606,
-   "equity": 351942.494,
-   "csm": 396592.606,
+   "liabilities": 2758275.323,
+   "equity": 351892.777,
+   "csm": 396642.323,
    "invested": 2895158.9
   },
   {
    "p": 24314,
    "period": "2026-02",
    "assets": 3110127.1,
-   "liabilities": 2771240.625,
-   "equity": 338886.475,
-   "csm": 398240.825,
+   "liabilities": 2771317.155,
+   "equity": 338809.945,
+   "csm": 398317.355,
    "invested": 2896797.8
   },
   {
    "p": 24315,
    "period": "2026-03",
    "assets": 3112873.5,
-   "liabilities": 2778231.202,
-   "equity": 334642.298,
-   "csm": 400130.502,
+   "liabilities": 2778333.989,
+   "equity": 334539.511,
+   "csm": 400233.289,
    "invested": 2900600.5
   },
   {
    "p": 24316,
    "period": "2026-04",
    "assets": 3136227.0,
-   "liabilities": 2784757.176,
-   "equity": 351469.824,
-   "csm": 401571.176,
+   "liabilities": 2784872.821,
+   "equity": 351354.179,
+   "csm": 401686.821,
    "invested": 2918704.6
   },
   {
    "p": 24317,
    "period": "2026-05",
    "assets": 3138689.6,
-   "liabilities": 2790086.896,
-   "equity": 348602.704,
-   "csm": 402872.496,
+   "liabilities": 2790222.958,
+   "equity": 348466.642,
+   "csm": 403008.558,
    "invested": 2928053.9
   },
   {
    "p": 24318,
    "period": "2026-06",
    "assets": 3145390.3,
-   "liabilities": 2795108.777,
-   "equity": 350281.523,
-   "csm": 404055.077,
+   "liabilities": 2795259.292,
+   "equity": 350131.008,
+   "csm": 404205.592,
    "invested": 2932560.7
   },
   {
    "p": 24319,
    "period": "2026-07",
    "assets": 3172182.7,
-   "liabilities": 2804393.218,
-   "equity": 367789.482,
-   "csm": 405781.018,
+   "liabilities": 2804559.641,
+   "equity": 367623.059,
+   "csm": 405947.441,
    "invested": 2955201.3
   },
   {
    "p": 24320,
    "period": "2026-08",
    "assets": 3175927.6,
-   "liabilities": 2808469.344,
-   "equity": 367458.256,
-   "csm": 407275.244,
+   "liabilities": 2808643.243,
+   "equity": 367284.357,
+   "csm": 407449.143,
    "invested": 2960635.6
   },
   {
    "p": 24321,
    "period": "2026-09",
    "assets": 3180083.3,
-   "liabilities": 2822440.031,
-   "equity": 357643.269,
-   "csm": 406991.931,
+   "liabilities": 2822858.616,
+   "equity": 357224.684,
+   "csm": 407410.516,
    "invested": 2964803.2
   }
  ],
@@ -4634,7 +4634,7 @@ window.TRACE_DATA = {
   }
  ],
  "ifrs17": {
-  "summary": "GMM CSM 당월 변동 -310 중 사업비 관련 -1,709.3 (신계약비 경험조정 -509.3, 사업비 가정변경 -1,200.0). 신계약비 실제가 예정보다 681.5 많았고, 증가 기여 1위는 영업채널팀 모집수수료 (+663.6), 대표 전표는 AA보험대리점 '9월 신상품 GA 판매시책비 (추가 수수료)' 650.0. 당기손익 반영 경험차이 -113.9. VFA(변액) CSM 당월 변동 +27 중 사업비 관련 -105.3.",
+  "summary": "GMM CSM 당월 변동 -107 중 사업비 관련 -1,505.6 (취득현금흐름 경험조정 -305.6, 사업비 가정변경 -1,200.0). 신계약비 실제가 예정보다 681.5 많았고, 증가 기여 1위는 영업채널팀 모집수수료 (+663.6), 대표 전표는 AA보험대리점 '9월 신상품 GA 판매시책비 (추가 수수료)' 650.0. 당기손익 반영 경험차이 -359.7. VFA(변액) CSM 당월 변동 +69 중 사업비 관련 -63.2.",
   "alloc": [
    {
     "cat": "비귀속",
@@ -4681,7 +4681,9 @@ window.TRACE_DATA = {
     "actual": 1390.9084,
     "expected": 1015.413,
     "diff": -375.4954,
-    "target": "CSM 조정 (GMM)"
+    "target": "CSM 60% (GMM) · 나머지 손익",
+    "csm": -225.2973,
+    "pl": -150.1982
    },
    {
     "pf": "PF01",
@@ -4691,7 +4693,9 @@ window.TRACE_DATA = {
     "actual": 84.8657,
     "expected": 72.511,
     "diff": -12.3547,
-    "target": "당기손익(보험서비스결과)"
+    "target": "당기손익(보험서비스결과)",
+    "csm": 0.0,
+    "pl": -12.3547
    },
    {
     "pf": "PF01",
@@ -4701,7 +4705,9 @@ window.TRACE_DATA = {
     "actual": 252.8313,
     "expected": 241.307,
     "diff": -11.5243,
-    "target": "당기손익(보험서비스결과)"
+    "target": "당기손익(보험서비스결과)",
+    "csm": 0.0,
+    "pl": -11.5243
    },
    {
     "pf": "PF02",
@@ -4711,7 +4717,9 @@ window.TRACE_DATA = {
     "actual": 505.7849,
     "expected": 372.007,
     "diff": -133.7779,
-    "target": "CSM 조정 (GMM)"
+    "target": "CSM 60% (GMM) · 나머지 손익",
+    "csm": -80.2667,
+    "pl": -53.5112
    },
    {
     "pf": "PF02",
@@ -4721,7 +4729,9 @@ window.TRACE_DATA = {
     "actual": 50.9194,
     "expected": 43.487,
     "diff": -7.4324,
-    "target": "당기손익(보험서비스결과)"
+    "target": "당기손익(보험서비스결과)",
+    "csm": 0.0,
+    "pl": -7.4324
    },
    {
     "pf": "PF02",
@@ -4731,7 +4741,9 @@ window.TRACE_DATA = {
     "actual": 151.6988,
     "expected": 143.858,
     "diff": -7.8408,
-    "target": "당기손익(보험서비스결과)"
+    "target": "당기손익(보험서비스결과)",
+    "csm": 0.0,
+    "pl": -7.8408
    },
    {
     "pf": "PF03",
@@ -4741,7 +4753,9 @@ window.TRACE_DATA = {
     "actual": 252.8924,
     "expected": 185.945,
     "diff": -66.9474,
-    "target": "당기손익"
+    "target": "당기손익",
+    "csm": 0.0,
+    "pl": -66.9474
    },
    {
     "pf": "PF03",
@@ -4751,7 +4765,9 @@ window.TRACE_DATA = {
     "actual": 13.5785,
     "expected": 11.936,
     "diff": -1.6425,
-    "target": "당기손익(보험서비스결과)"
+    "target": "당기손익(보험서비스결과)",
+    "csm": 0.0,
+    "pl": -1.6425
    },
    {
     "pf": "PF03",
@@ -4761,7 +4777,9 @@ window.TRACE_DATA = {
     "actual": 40.453,
     "expected": 38.694,
     "diff": -1.759,
-    "target": "당기손익(보험서비스결과)"
+    "target": "당기손익(보험서비스결과)",
+    "csm": 0.0,
+    "pl": -1.759
    },
    {
     "pf": "PF04",
@@ -4771,7 +4789,9 @@ window.TRACE_DATA = {
     "actual": 379.3387,
     "expected": 274.07,
     "diff": -105.2687,
-    "target": "CSM 조정 (VFA)"
+    "target": "CSM 60% (VFA) · 나머지 손익",
+    "csm": -63.1612,
+    "pl": -42.1075
    },
    {
     "pf": "PF04",
@@ -4781,7 +4801,9 @@ window.TRACE_DATA = {
     "actual": 20.3678,
     "expected": 17.587,
     "diff": -2.7808,
-    "target": "당기손익(보험서비스결과)"
+    "target": "당기손익(보험서비스결과)",
+    "csm": 0.0,
+    "pl": -2.7808
    },
    {
     "pf": "PF04",
@@ -4791,29 +4813,31 @@ window.TRACE_DATA = {
     "actual": 60.6795,
     "expected": 59.089,
     "diff": -1.5905,
-    "target": "당기손익(보험서비스결과)"
+    "target": "당기손익(보험서비스결과)",
+    "csm": 0.0,
+    "pl": -1.5905
    }
   ],
   "totals": {
-   "csm": -509.2733,
-   "csmVfa": -105.2687,
-   "pl": -113.8726
+   "csm": -305.564,
+   "csmVfa": -63.1612,
+   "pl": -359.6894
   },
   "recon": [
    {
     "pf": "PF01",
     "model": "GMM",
-    "actuary": -375.495,
-    "trace": -375.4954,
-    "diff": 0.0004,
+    "actuary": -225.297,
+    "trace": -225.2973,
+    "diff": 0.0003,
     "status": "일치"
    },
    {
     "pf": "PF02",
     "model": "GMM",
-    "actuary": -133.778,
-    "trace": -133.7779,
-    "diff": -0.0001,
+    "actuary": -80.267,
+    "trace": -80.2667,
+    "diff": -0.0003,
     "status": "일치"
    },
    {
@@ -4827,9 +4851,9 @@ window.TRACE_DATA = {
    {
     "pf": "PF04",
     "model": "VFA",
-    "actuary": -105.269,
-    "trace": -105.2687,
-    "diff": -0.0003,
+    "actuary": -63.161,
+    "trace": -63.1612,
+    "diff": 0.0002,
     "status": "일치"
    }
   ],
@@ -4839,7 +4863,7 @@ window.TRACE_DATA = {
     "name": "기초잔액",
     "bel": 1808419.77,
     "ra": 104778.14,
-    "csm": 354425.803,
+    "csm": 354578.007,
     "expense": false
    },
    {
@@ -4868,10 +4892,10 @@ window.TRACE_DATA = {
    },
    {
     "code": "F31",
-    "name": "경험조정-신계약비",
+    "name": "경험조정-취득현금흐름",
     "bel": 0.0,
     "ra": 0.0,
-    "csm": -509.273,
+    "csm": -305.564,
     "expense": true
    },
    {
@@ -4887,7 +4911,7 @@ window.TRACE_DATA = {
     "name": "보험금융비용(이자부리)",
     "bel": 4521.05,
     "ra": 209.556,
-    "csm": 886.065,
+    "csm": 886.445,
     "expense": false
    },
    {
@@ -4895,7 +4919,7 @@ window.TRACE_DATA = {
     "name": "CSM 상각",
     "bel": 0.0,
     "ra": 0.0,
-    "csm": -3189.833,
+    "csm": -3191.202,
     "expense": false
    },
    {
@@ -4919,7 +4943,7 @@ window.TRACE_DATA = {
     "name": "기말잔액",
     "bel": 1818476.797,
     "ra": 104486.76,
-    "csm": 354115.821,
+    "csm": 354470.745,
     "expense": false
    }
   ],
@@ -4929,7 +4953,7 @@ window.TRACE_DATA = {
     "name": "기초잔액",
     "bel": 326822.85,
     "ra": 16024.892,
-    "csm": 52849.441,
+    "csm": 52871.136,
     "expense": false
    },
    {
@@ -4958,10 +4982,10 @@ window.TRACE_DATA = {
    },
    {
     "code": "F31",
-    "name": "경험조정-신계약비",
+    "name": "경험조정-취득현금흐름",
     "bel": 0.0,
     "ra": 0.0,
-    "csm": -105.269,
+    "csm": -63.161,
     "expense": true
    },
    {
@@ -4977,7 +5001,7 @@ window.TRACE_DATA = {
     "name": "보험금융비용(이자부리)",
     "bel": 817.057,
     "ra": 32.05,
-    "csm": 132.124,
+    "csm": 132.178,
     "expense": false
    },
    {
@@ -4985,7 +5009,7 @@ window.TRACE_DATA = {
     "name": "CSM 상각",
     "bel": 0.0,
     "ra": 0.0,
-    "csm": -475.645,
+    "csm": -475.84,
     "expense": false
    },
    {
@@ -5009,14 +5033,14 @@ window.TRACE_DATA = {
     "name": "기말잔액",
     "bel": 328640.385,
     "ra": 15980.328,
-    "csm": 52876.11,
+    "csm": 52939.771,
     "expense": false
    }
   ],
-  "csmChange": -309.982,
-  "csmExpense": -1709.273,
-  "csmChangeVfa": 26.669,
-  "csmExpenseVfa": -105.269,
+  "csmChange": -107.262,
+  "csmExpense": -1505.564,
+  "csmChangeVfa": 68.635,
+  "csmExpenseVfa": -63.161,
   "drivers": [
    {
     "dept": "영업채널팀",

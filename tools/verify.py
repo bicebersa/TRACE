@@ -105,6 +105,11 @@ def main():
     for i, r in enumerate(X["pf"]):
         v = g("IFRS17_사업비", f"G{L['B0'] + 1 + i}")
         if not isinstance(v, float) or abs(v - r["diff"]) > 0.06: bad.append(f"IFRS17 경험차이 {r['pf']} {r['cat']}: {v} vs {r['diff']}")
+        for col, f in (("I", "csm"), ("J", "pl")):   # CSM 반영 · 당기손익 반영
+            v = g("IFRS17_사업비", f"{col}{L['B0'] + 1 + i}"); v = 0.0 if v in ("", None) else v
+            if not isinstance(v, float) or abs(v - r[f]) > 0.06: bad.append(f"IFRS17 {f} {r['pf']} {r['cat']}: {v} vs {r[f]}")
+        hx = g("IFRS17_사업비", "H%d" % (L["B0"] + 1 + i))
+        if hx != r["target"]: bad.append("IFRS17 반영처 %s %s: %s vs %s" % (r["pf"], r["cat"], hx, r["target"]))
     print(f"\n수식 오류: {len(errs)}건 {errs[:5]}")
     print(f"자가진단: {g('자가진단', 'B4')}")
     print(f"원인분석 선택: {key} · 원인 후보: {xl_c}")
