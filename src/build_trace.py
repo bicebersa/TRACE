@@ -507,6 +507,8 @@ header(va, 6, ["분기 한도\n(배정+조정)", "분기 실적", "분기 잔여
 va.cell(row=5, column=36, value="④-2 분기 한도 점검 (예산 통제 단위: 부서 × 계정 × 분기)").font = F(bold=True)
 header(va, 6, ["월 소진속도\n(기울기)", "절편", "추세\n연말 누계", "고갈\n예상(개월)", "고갈\n예상일", "추세 판정", "분기 고갈\n예상일"], start=42, h=44)
 header(va, 6, ["고갈\n정렬키"], start=49, fill=GRAYH, h=44)
+header(va, 6, ["전년동기\n누계", "전년동기\n누계 대비"], start=50, h=44)
+va.cell(row=5, column=50, value="③-2 누계 비교").font = F(bold=True)
 va.cell(row=5, column=42, value="④-3 소진 추세 (선형: 연초 0부터 월별 누계실적에 직선을 맞춰 연간가용에 닿는 시점)").font = F(bold=True)
 for c, t_ in [(6, "③ 변동"), (16, "④ 예산 점검"), (26, "⑤ 주의")]:
     va.cell(row=5, column=c, value=t_).font = F(bold=True)
@@ -565,11 +567,13 @@ for idx in range(VA_PRE - 7):
     }
     fm.update(burn_formulas(r, blank, f"월별집계!$AB{r}:$AM{r}", f"P{r}", f"Q{r}", "AP", "AQ", "AS", "AU"))
     fm[48] = (f'={blank},{qdepl(f"AJ{r}", f"AK{r}")})', GREEN, None)
+    fm[50] = (f'={blank},SUMIFS({row_},{hdr},">="&(({S["yr"]}-1)*12+1),{hdr},"<="&({S["P"]}-12)))', GREEN, NUM)
+    fm[51] = (rate(f"Q{r}", f"AX{r}"), BLACK, RATE)
     fm[49] = (f'=IF($A{r}="",999+ROW()/1000000,IF(AU{r}="이미 소진",ROW()/1000000,IF(AU{r}="연내 고갈",AS{r}+ROW()/1000000,99+ROW()/1000000)))', BLACK, "0.000")
     for c, (f_, col, fmt) in fm.items():
         put(va, r, c, f_, col, fmt, align="center" if c in (5, 23, 25, 41, 46, 47, 48) else None)
-va.freeze_panes = "F7"; va.auto_filter.ref = f"A6:AW{VA_PRE-1}"
-widths(va, [8, 12, 10, 18, 8] + [9] * 10 + [11, 10, 10, 10, 10, 10, 8, 10, 9, 9, 20, 7] + [8] * 8 + [11, 10, 10, 10, 8, 10] + [10, 9, 10, 8, 11, 10, 12, 8])
+va.freeze_panes = "F7"; va.auto_filter.ref = f"A6:AY{VA_PRE-1}"
+widths(va, [8, 12, 10, 18, 8] + [9] * 10 + [11, 10, 10, 10, 10, 10, 8, 10, 9, 9, 20, 7] + [8] * 8 + [11, 10, 10, 10, 8, 10] + [10, 9, 10, 8, 11, 10, 12, 8] + [10, 9])
 for val, fill in (('"이미 소진"', "F8CBAD"), ('"연내 고갈"', "FCE4D6"), ('"무예산"', "D9C3E9")):
     va.conditional_formatting.add(f"AU7:AU{VA_END}", CellIsRule(operator="equal", formula=[val], fill=PatternFill("solid", fgColor=fill)))
 for val, fill in (('"한도 초과"', "F8CBAD"), ('"초과 예상"', "FCE4D6"), ('"주의"', "FFE699"), ('"무예산"', "D9C3E9")):
@@ -693,7 +697,7 @@ kw.freeze_panes = "A5"; widths(kw, [16, 9, 9, 9, 9, 9, 52, 12, 10])
 # =================================================================== 원인분석
 ca = wb.create_sheet("원인분석")
 title(ca, "원인분석 (한 항목씩)", "C5~C8만 입력 · 선택 항목의 증가분을 거래처·전표로 쪼개고 8가지 패턴으로 원인 후보를 만듭니다 · 금액: 보고단위")
-sel = [(5, "주의대상 순위", 1, "1~10"), (6, "비교 기준", "전월", "전월 / 전년동월 / 전분기"),
+sel = [(5, "주의대상 순위", 1, "1~10"), (6, "비교 기준", "전월", "전월 / 전분기 / 전년동기누적 / 전년동월"),
        (7, "직접 지정: 부서코드", None, "비워두면 순위 사용"), (8, "직접 지정: G/L 계정", None, "부서코드와 함께 입력")]
 if os.environ.get("SEL"):
     _d, _g, _b = os.environ["SEL"].split(",")
@@ -701,12 +705,12 @@ if os.environ.get("SEL"):
 for rr, k, v, d in sel:
     put(ca, rr, 2, k, bold=True, fill=SUB); c = put(ca, rr, 3, v, BLUE, fill=YEL, align="center"); put(ca, rr, 4, d, GRAY)
     if rr == 8: c.number_format = "@"
-dv = DataValidation(type="list", formula1='"전월,전년동월,전분기"'); ca.add_data_validation(dv); dv.add("C6")
+dv = DataValidation(type="list", formula1='"전월,전분기,전년동기누적,전년동월"'); ca.add_data_validation(dv); dv.add("C6")
 dv = DataValidation(type="whole", operator="between", formula1="1", formula2="10"); ca.add_data_validation(dv); dv.add("C5")
 calc = [(9, "(계산) 선택 키", f'=IF(AND(C7<>"",C8<>""),C7&"|"&C8,IFERROR(INDEX(주의대상!$L$6:$L$15,C5),""))'),
-        (10, "(계산) 당기 시작", f'=IF(C6="전분기",{S["qs"]},{S["P"]})'), (11, "(계산) 당기 끝", f'={S["P"]}'),
-        (12, "(계산) 비교 시작", f'=IF(C6="전월",{S["P"]}-1,IF(C6="전년동월",{S["P"]}-12,{S["qs"]}-3))'),
-        (13, "(계산) 비교 끝", f'=IF(C6="전월",{S["P"]}-1,IF(C6="전년동월",{S["P"]}-12,{S["P"]}-3))')]
+        (10, "(계산) 당기 시작", f'=IF(C6="전분기",{S["qs"]},IF(C6="전년동기누적",{S["yr"]}*12+1,{S["P"]}))'), (11, "(계산) 당기 끝", f'={S["P"]}'),
+        (12, "(계산) 비교 시작", f'=IF(C6="전월",{S["P"]}-1,IF(C6="전년동월",{S["P"]}-12,IF(C6="전년동기누적",({S["yr"]}-1)*12+1,{S["qs"]}-3)))'),
+        (13, "(계산) 비교 끝", f'=IF(C6="전월",{S["P"]}-1,IF(C6="전년동월",{S["P"]}-12,IF(C6="전년동기누적",{S["P"]}-12,{S["P"]}-3)))')]
 for rr, k, f_ in calc:
     put(ca, rr, 2, k, GRAY, fill=TOT); put(ca, rr, 3, f_, GREEN if rr != 11 else GREEN, "0" if rr > 9 else None, align="center", fill=TOT)
 # 선택 항목 이름 · 기간 라벨
@@ -871,17 +875,24 @@ wt["A3"] = f'="기준: "&{plabel(S["P"])}&" · 단위: "&{S["ur"]}&" · 분기 �
 wt["A3"].font = F(GREEN, size=9)
 header(wt, 5, ["순위", "부서", "계정", "당월", "전월\n대비", "전년동월\n대비", "분기 판정", "분기\n소진율", "연간 판정", "빠른 신호", "점수", "키", "확인된 원인 (코멘트)"], h=32)
 header(wt, 5, ["행"], start=14, fill=GRAYH, h=32)
+header(wt, 5, ["당분기", "전분기\n대비", "당해\n누계", "전년동기\n누계 대비"], start=15, h=32)
+header(wt, 5, ["연간가용", "월 소진속도", "절편", "추세\n연말 누계", "고갈\n예상(개월)", "고갈\n예상일", "추세 판정", "분기 고갈\n예상일"] + [f"누계\n{m}월" for m in range(1, 13)], start=19, fill=GRAYH, h=32)
+wt.cell(row=4, column=19, value="고갈 추세 (대시보드 주의 대상 상세 그래프용)").font = F(GRAY, size=9)
 for k in range(1, 11):
     r = 5 + k
     put(wt, r, 1, k, align="center", bold=True)
     put(wt, r, 14, f'=IFERROR(MATCH(LARGE({VR("AB")},A{r}),{VR("AB")},0),"")', GRAY)
-    for c, src, fmt in [(2, "B", None), (3, "D", None), (4, "F", NUM), (5, "H", RATE), (6, "J", RATE), (7, "AO", None), (8, "AN", PCT), (9, "W", None), (10, "Z", None), (11, "AA", "0.0"), (12, "E", None)]:
+    for c, src, fmt in [(2, "B", None), (3, "D", None), (4, "F", NUM), (5, "H", RATE), (6, "J", RATE), (7, "AO", None), (8, "AN", PCT), (9, "W", None), (10, "Z", None), (11, "AA", "0.0"), (12, "E", None),
+                        (15, "K", NUM), (16, "M", RATE), (17, "Q", NUM), (18, "AY", RATE),
+                        (19, "P", NUM), (20, "AP", NUM), (21, "AQ", NUM), (22, "AR", NUM), (23, "AS", "0.0"), (24, "AT", None), (25, "AU", None), (26, "AV", None)]:
         put(wt, r, c, f'=IF($N{r}="","",INDEX({VR(src)},$N{r}))', GREEN, fmt, align="center" if c in (7, 9, 11) else None)
+    for j in range(12):
+        put(wt, r, 27 + j, f'=IF($N{r}="","",INDEX(월별집계!${CL(28 + j)}$7:${CL(28 + j)}${VA_END},$N{r}))', GREEN, NUM)
     put(wt, r, 13, f'=IF($L{r}="","",IFERROR(INDEX(코멘트!$F$5:$F$2004,MATCH({S["yr"]}&"|"&{S["mon"]}&"|"&$L{r},코멘트!$I$5:$I$2004,0)),"(미확인)"))', GREEN, wrap=True)
     wt.row_dimensions[r].height = 30
 for val, fill in (('"한도 초과"', "F8CBAD"), ('"초과 예상"', "FCE4D6"), ('"부족 예상"', "F8CBAD"), ('"주의"', "FFE699"), ('"무예산"', "D9C3E9")):
     wt.conditional_formatting.add("G6:G15", CellIsRule(operator="equal", formula=[val], fill=PatternFill("solid", fgColor=fill)))
-widths(wt, [6, 12, 18, 9, 8, 9, 10, 9, 8, 22, 6, 4, 50, 5])
+widths(wt, [6, 12, 18, 9, 8, 9, 10, 9, 8, 22, 6, 4, 50, 5, 9, 8, 10, 9] + [9] * 20)
 wt.column_dimensions["L"].hidden = True
 wt.freeze_panes = "A6"
 
@@ -1232,11 +1243,13 @@ STAT = ["여유", "주의", "초과 예상", "한도 초과", "무예산"]
 for k, s_ in enumerate(STAT):
     put(cd, CDC + 1 + k, 1, s_, align="center"); put(cd, CDC + 1 + k, 2, f'=COUNTIF({VR("AO")},A{CDC+1+k})', GREEN, "0")
 CDD = 37  # 계정별
-header(cd, CDD, ["G/L 계정", "계정명", "당월", "전년동월", "증감"], h=20)
-for i in range(len(sgl)):
+header(cd, CDD, ["G/L 계정", "계정명", "당월", "전년동월", "증감", "전월", "당분기", "전분기", "당해 누계", "전년동기 누계"], h=30)
+for i in range(len(sgl)):   # 모두 전표 기준(변동분석 합계) — 같은 출처끼리 비교
     r = CDD + 1 + i
     put(cd, r, 1, f"=계정변동!A{6+i}", GREEN, align="center"); put(cd, r, 2, f"=계정변동!B{6+i}", GREEN)
-    put(cd, r, 3, f"=계정변동!C{6+i}", GREEN, NUM); put(cd, r, 4, f"=계정변동!F{6+i}", GREEN, NUM); put(cd, r, 5, f"=C{r}-D{r}", fmt=NUM)
+    for c, col in ((3, "F"), (4, "I"), (6, "G"), (7, "K"), (8, "L"), (9, "Q"), (10, "AX")):
+        put(cd, r, c, f'=SUMIFS({VR(col)},{VR("C")},$A{r}&"")', GREEN, NUM)
+    put(cd, r, 5, f"=C{r}-D{r}", fmt=NUM)
 CDE = 56  # BS 추이 (최근 12개월)
 header(cd, CDE, ["기간번호", "기간", "자산총계", "부채총계", "자본총계", "보험계약마진\n(CSM)", "운용자산"], h=30)
 for k in range(12):
@@ -1262,11 +1275,13 @@ KPI = [("총자산", bsv("A000", S["P"]), bsv("A000", S["P"] + "-12"), "전년�
        ("사업비 누계", f'SUMIFS({JR("P")},{JR("M")},">="&({S["yr"]}*12+1),{JR("M")},"<="&{S["P"]})',
         f'SUMIFS({JR("P")},{JR("M")},">="&(({S["yr"]}-1)*12+1),{JR("M")},"<="&({S["P"]}-12))', "전년 누계"),
        ("사업비 당월", "월별집계!Z6", "월별집계!Y6", "전월"),
+       ("사업비 당분기", f'SUM({VR("K")})', f'SUM({VR("L")})', "전분기"),
        ("분기 한도 초과(예상)", f'COUNTIF({VR("AO")},"한도 초과")+COUNTIF({VR("AO")},"초과 예상")', f'COUNTIF({VR("AO")},"주의")', "주의 건수")]
 for k, (lab, a, b, basis) in enumerate(KPI):
     r = CDG + 1 + k
-    put(cd, r, 1, lab, bold=True); put(cd, r, 2, "=" + a, GREEN, NUM0 if k < 6 else "0"); put(cd, r, 3, "=" + b, GREEN, NUM0 if k < 6 else "0")
-    put(cd, r, 4, "" if k == 6 else f"=IF(C{r}<=0,0,B{r}/C{r}-1)", fmt=RATE); put(cd, r, 5, basis, GRAY)
+    last = k == len(KPI) - 1   # 마지막 '분기 한도 초과(예상)'는 건수
+    put(cd, r, 1, lab, bold=True); put(cd, r, 2, "=" + a, GREEN, "0" if last else NUM0); put(cd, r, 3, "=" + b, GREEN, "0" if last else NUM0)
+    put(cd, r, 4, "" if last else f"=IF(C{r}<=0,0,B{r}/C{r}-1)", fmt=RATE); put(cd, r, 5, basis, GRAY)
 CDH = 96  # 소진 추세: 1행 전사 + 고갈이 빠른 부서×계정 15개 (변동분석 AW열 정렬키 순)
 NBURN = 15
 header(cd, CDH, ["고갈 순위", "부서", "계정", "연간가용", "누계실적", "월 소진속도", "절편", "추세\n연말 누계", "고갈\n예상(개월)", "고갈\n예상일", "추세 판정", "분기 고갈\n예상일"]

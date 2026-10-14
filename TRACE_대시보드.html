@@ -23,6 +23,10 @@ header.top h1 small { font-weight: 500; color: var(--muted); font-family: var(--
 .kpi .s { font-size: 12px; color: var(--muted); }
 .kpi .s b { display: inline-block; padding: 0 6px; border-radius: 5px; background: var(--grid); color: var(--ink); font-family: var(--mono); }
 .kpi .s b.up { background: var(--crit-soft); color: var(--crit); } .kpi .s b.down { background: var(--accent-soft); color: var(--accent); }
+td.r.on, th.r.on { background: color-mix(in srgb, var(--accent-soft) 70%, transparent); font-weight: 700; }
+.seg.basis button { padding: 4px 12px; font-size: 12.5px; }
+.burn-in { display: grid; gap: 8px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--grid); border-radius: 10px; }
+.burn-in h3 { display: flex; align-items: center; gap: 8px; }
 /* 첫 화면 큰 버튼 두 개 */
 .acts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 @media (max-width: 720px) { .acts { grid-template-columns: 1fr; } }
@@ -268,6 +272,17 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
     }
     return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(b.dept + " " + b.account + " 누계 실적과 추세선") + '">' + g + '</svg>';
   }
+  // 주의 대상 상세 안의 고갈 추세 (항목별)
+  var CUR_M = 12;
+  function burnBlock(b) {
+    if (!b || b.status === undefined || b.status === null) return "";
+    if (!(+b.budget > 0)) return '<div class="burn-in"><h3>예산 고갈 추세</h3><p class="muted" style="margin:0">' + esc(b.status === "무예산" ? "연간 예산(배정+조정)이 없는 항목입니다." : "연간 예산이 없습니다.") + '</p></div>';
+    return '<div class="burn-in"><div class="card-head"><h3>예산 고갈 추세 <span class="pill ' + burnCls(b.status) + '">' + esc(b.status) + '</span></h3>' +
+      '<div class="legend"><span><i style="background:var(--accent)"></i>누계 실적</span><span><i class="line" style="background:var(--accent-ink)"></i>추세선</span><span><i class="line" style="background:var(--budget)"></i>연간가용</span></div></div>' +
+      burnChart(b, CUR_M) +
+      '<div class="burn-facts"><span>월 소진속도 <b>' + fmt(b.slope, 1) + '</b></span><span>누계 <b>' + fmt(b.ytd, 1) + '</b> / 가용 <b>' + fmt(b.budget, 1) + '</b></span>' +
+      '<span>연간 고갈 <b>' + esc(b.date || "-") + '</b></span><span>분기 고갈 <b>' + esc(b.qdate || "-") + '</b></span></div></div>';
+  }
   function wireBurn(B, M) {
     var list = document.getElementById("burn-list"), chart = document.getElementById("burn-chart"), facts = document.getElementById("burn-facts");
     list.innerHTML = B.map(function (b, i) {
@@ -294,10 +309,25 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
     '<a class="act" href="TRACE_내려받기.html"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></span>' +
     '<b>엑셀 양식 내려받기</b><span class="d">본체 · 입력 양식 7종 · 감독원 샘플 · 전체 묶음(ZIP)</span><span class="go" aria-hidden="true">→</span></a></div>';
 
+  // ---------- 비교 기준 (전월 · 전분기 · 전년동기누적): 사업비·주의 대상 탭이 함께 씀
+  var BASES = [["전월", "당월", "전월"], ["전분기", "당분기", "전분기"], ["전년동기누적", "당해 누계", "전년 동기 누계"]];
+  var BASIS = "전월";
+  try { BASIS = localStorage.getItem("trace-basis") || "전월"; } catch (e) { /* 저장이 막힌 환경 */ }
+  if (!BASES.some(function (b) { return b[0] === BASIS; })) BASIS = "전월";
+  function basisInfo() { return BASES.filter(function (b) { return b[0] === BASIS; })[0]; }
+  function basisSeg() {
+    return '<span class="seg basis" role="group" aria-label="비교 기준">' + BASES.map(function (b) {
+      return '<button type="button" data-basis="' + b[0] + '" aria-pressed="' + (b[0] === BASIS) + '">' + b[0] + '</button>'; }).join("") + '</span>';
+  }
+  function topRate(t) { return BASIS === "전월" ? t.mom : BASIS === "전분기" ? t.qoq : t.ytdRate; }
+  function topAmt(t) { return BASIS === "전월" ? t.cur : BASIS === "전분기" ? t.qcur : t.ytd; }
+  function topCause(t) { return BASIS === "전월" ? t.cause : (t.causes && t.causes[BASIS]) || null; }
+
   // ---------- 그리기 (불러온 자료로 화면 전체를 다시 그림)
   function render(D) {
   app.innerHTML = "";
   window.TRACE_CURRENT = D;   // 챗봇이 지금 화면 자료를 요약해 보낼 때 씀
+  CUR_M = +String(D.meta && D.meta.period || "").slice(5, 7) || 12;
   var m = D.meta;
   var ok = function (s) { return /정상|일치/.test(s || ""); };
   app.appendChild(el('<header class="top"><div style="display:grid;gap:4px"><span class="eyebrow">사업비 원인추적기 · ' + esc(m.period) + ' 마감</span><h1>' + esc(m.company) + ' 사업비 대시보드<small>' + esc(m.period) + '</small></h1></div>' +
@@ -341,19 +371,25 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   }).join("");
   var colors = { "여유": "var(--accent)", "주의": "var(--warn)", "초과 예상": "#d9822b", "한도 초과": "var(--crit)", "부족 예상": "var(--crit)", "무예산": "var(--info)" };
   var st = D.status.map(function (s) { return { status: s.status, count: s.count, color: colors[s.status] }; });
-  var acc = D.accounts.slice().sort(function (a, b) { return b.cur - a.cur; });
-  var amax = Math.max.apply(null, acc.map(function (a) { return Math.max(a.cur, a.prevYear); })) || 1;
+  var hasBasis = D.accounts.length && D.accounts[0].prevMonth !== undefined, bi = basisInfo();
+  var pair = function (a) {   // [당기, 비교] — 예전 data.js(전년동월만 있음)는 그대로 표시
+    if (!hasBasis) return [a.cur, a.prevYear];
+    return BASIS === "전월" ? [a.cur, a.prevMonth] : BASIS === "전분기" ? [a.qCur, a.qPrev] : [a.ytd, a.ytdPrev];
+  };
+  var acc = D.accounts.slice().sort(function (a, b) { return pair(b)[0] - pair(a)[0]; });
+  var amax = Math.max.apply(null, acc.map(function (a) { var p = pair(a); return Math.max(p[0] || 0, p[1] || 0); })) || 1;
   var accRows = acc.map(function (a) {
-    var r = a.prevYear > 0 ? a.cur / a.prevYear - 1 : null;
-    return '<div class="arow"><span title="' + esc(a.gl) + '">' + esc(a.name) + '</span><div class="abars"><span class="c" style="width:' + (a.cur / amax * 100).toFixed(1) + '%"></span><span class="p" style="width:' + (a.prevYear / amax * 100).toFixed(1) + '%"></span></div>' +
-      '<span class="d ' + (r > 0.2 ? "up" : "") + '">' + (r === null ? "신규" : pct(r, true)) + '</span></div>';
+    var p = pair(a), r = p[1] > 0 ? p[0] / p[1] - 1 : null;
+    return '<div class="arow"><span title="' + esc(a.gl) + ' · ' + esc(bi[1]) + ' ' + fmt(p[0], 1) + ' / ' + esc(bi[2]) + ' ' + fmt(p[1], 1) + '">' + esc(a.name) + '</span><div class="abars"><span class="c" style="width:' + ((p[0] || 0) / amax * 100).toFixed(1) + '%"></span><span class="p" style="width:' + ((p[1] || 0) / amax * 100).toFixed(1) + '%"></span></div>' +
+      '<span class="d ' + (r > 0.2 ? "up" : "") + '">' + (r === null ? (p[0] > 0 ? "신규" : "-") : pct(r, true)) + '</span></div>';
   }).join("");
-  app.appendChild(el('<section data-tab="expense"><div class="sec-head"><span class="eyebrow">TREND · RISK</span><h2>사업비</h2><span class="muted">전표 기준 · 예산 통제는 부서 × 계정 × 분기 한도 (예산판 배정+조정)</span></div><div class="grid2">' +
+  var accTitle = hasBasis ? "계정별 " + bi[1] + " vs " + bi[2] : "계정별 당월 vs 전년동월", accLeg = hasBasis ? [bi[1], bi[2]] : ["당월", "전년동월"];
+  app.appendChild(el('<section data-tab="expense"><div class="sec-head"><span class="eyebrow">TREND · RISK</span><h2>사업비</h2><span class="muted">전표 기준 · 예산 통제는 부서 × 계정 × 분기 한도 (예산판 배정+조정)</span>' + (hasBasis ? '<span style="margin-left:auto">비교 기준 ' + basisSeg() + '</span>' : '') + '</div><div class="grid2">' +
     '<div class="card"><div class="card-head"><h3>월별 사업비</h3><div class="legend"><span><i style="background:var(--accent)"></i>당해</span><span><i style="background:var(--prev)"></i>전년</span><span><i class="line" style="background:var(--budget)"></i>예산(분기가용÷3)</span></div></div>' +
     barChart({ label: "월별 사업비", labels: labelsM, series: [{ name: "당해", values: D.monthly.map(function (r) { return r.cur; }), color: "var(--accent)" }, { name: "전년", values: D.monthly.map(function (r) { return r.prev; }), color: "var(--prev)" }], line: { values: D.monthly.map(function (r) { return r.budget; }), color: "var(--budget)" } }) + '</div>' +
     '<div class="card"><div class="card-head"><h3>부서별 분기 한도 소진</h3><div class="legend"><span><i style="background:var(--accent)"></i>분기 실적</span><span><i style="background:repeating-linear-gradient(135deg,var(--accent) 0 2px,transparent 2px 4px)"></i>분기말까지 예상</span><span><i style="background:var(--ink);width:2px"></i>분기 한도</span></div></div>' +
     '<div style="display:grid;gap:9px">' + deptRows + '</div><p class="muted" style="font-size:12px;margin:0">오른쪽 숫자 = 분기말 예상 실적 ÷ 분기 한도 (배정 + 조정)</p></div>' +
-    '<div class="card"><div class="card-head"><h3>계정별 당월 vs 전년동월</h3><div class="legend"><span><i style="background:var(--accent)"></i>당월</span><span><i style="background:var(--prev)"></i>전년동월</span></div></div><div class="scroll">' + accRows + '</div></div>' +
+    '<div class="card"><div class="card-head"><h3>' + esc(accTitle) + '</h3><div class="legend"><span><i style="background:var(--accent)"></i>' + esc(accLeg[0]) + '</span><span><i style="background:var(--prev)"></i>' + esc(accLeg[1]) + '</span></div></div><div class="scroll">' + accRows + '</div></div>' +
     '<div class="card"><div class="card-head"><h3>분기 한도 판정 분포</h3></div><div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">' + donut(st) +
     '<div style="display:grid;gap:8px">' + st.map(function (s) { return '<div style="display:flex;gap:10px;align-items:center"><span class="pill ' + statusCls(s.status) + '">' + esc(s.status) + '</span><span class="num" style="font-size:16px;font-weight:700">' + s.count + '</span><span class="muted">건</span></div>'; }).join("") +
     '<p class="muted" style="font-size:12px;margin:4px 0 0">분기말 예상 소진율 90% 초과 주의, 100% 초과 초과 예상, 이미 넘으면 한도 초과</p></div></div></div>' +
@@ -364,21 +400,27 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   if (B.length) wireBurn(B, +String(m.period).slice(5, 7) || 12);
 
   // ---------- 주의 대상 + 원인
+  var topBasis = D.top10.length && D.top10[0].qoq !== undefined;
+  var rcell = function (v, on) { return '<td class="r ' + (v > 0.2 ? "up" : "") + (on ? " on" : "") + '">' + pct(v, true) + '</td>'; };
   var rows = D.top10.map(function (t, i) {
     return '<tr class="pick" tabindex="0" data-i="' + i + '" aria-selected="false"><td class="rank">' + t.rank + '</td><td><b>' + esc(t.dept) + '</b><br><span class="sig">' + esc(t.account) + '</span></td>' +
-      '<td class="r">' + fmt(t.cur, 1) + '</td><td class="r ' + (t.mom > 0.2 ? "up" : "") + '">' + pct(t.mom, true) + '</td><td><span class="pill ' + statusCls(t.status) + '">' + esc(t.status) + '</span></td>' +
+      '<td class="r">' + fmt(topBasis ? topAmt(t) : t.cur, 1) + '</td>' + (topBasis ? rcell(t.mom, BASIS === "전월") + rcell(t.qoq, BASIS === "전분기") + rcell(t.ytdRate, BASIS === "전년동기누적") : rcell(t.mom, true)) +
+      '<td><span class="pill ' + statusCls(t.status) + '">' + esc(t.status) + '</span></td>' +
       '<td class="sig">' + esc(t.signal || "") + '</td><td class="r">' + fmt(t.score, 1) + '</td></tr>';
   }).join("");
-  var watch = el('<section data-tab="watch"><div class="sec-head"><span class="eyebrow">ANOMALY · CAUSE</span><h2>주의 대상 TOP 10</h2><span class="muted">행을 누르면 오른쪽에 원인 후보와 근거 전표가 나옵니다 (전월 대비)</span></div>' +
-    '<div class="watch"><div class="card tbl-wrap"><table><thead><tr><th>#</th><th>부서 · 계정</th><th class="r">당월</th><th class="r">전월대비</th><th>분기 한도</th><th>신호</th><th class="r">점수</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
+  var watch = el('<section data-tab="watch"><div class="sec-head"><span class="eyebrow">ANOMALY · CAUSE</span><h2>주의 대상 TOP 10</h2><span class="muted">행을 누르면 오른쪽에 원인 후보와 근거 전표가 나옵니다 (' + esc(topBasis ? BASIS : "전월") + ' 대비)</span>' + (topBasis ? '<span style="margin-left:auto">비교 기준 ' + basisSeg() + '</span>' : '') + '</div>' +
+    '<div class="watch"><div class="card tbl-wrap"><table><thead><tr><th>#</th><th>부서 · 계정</th><th class="r">' + esc(topBasis ? basisInfo()[1] : "당월") + '</th>' +
+    (topBasis ? '<th class="r' + (BASIS === "전월" ? " on" : "") + '">전월</th><th class="r' + (BASIS === "전분기" ? " on" : "") + '">전분기</th><th class="r' + (BASIS === "전년동기누적" ? " on" : "") + '">전년누적</th>' : '<th class="r">전월대비</th>') +
+    '<th>분기 한도</th><th>신호</th><th class="r">점수</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<div class="card detail" id="detail" aria-live="polite"></div></div></section>');
   app.appendChild(watch);
   function showDetail(i) {
-    var t = D.top10[i], c = t.cause;
+    var t = D.top10[i], c = topBasis ? topCause(t) : t.cause;
     watch.querySelectorAll("tr.pick").forEach(function (tr) { tr.setAttribute("aria-selected", tr.getAttribute("data-i") == i ? "true" : "false"); });
+    if (!c) { document.getElementById("detail").innerHTML = '<div class="card-head"><h3>' + t.rank + '. ' + esc(t.dept) + ' · ' + esc(t.account) + '</h3></div><p class="muted">' + esc(BASIS) + ' 기준 원인 분석이 이 자료에 없습니다. 엑셀에서 [대시보드 내보내기]를 다시 실행한 파일(또는 data.js)을 올리면 나옵니다. 엑셀 원인분석 시트 C6에서 비교 기준을 바꿔 볼 수도 있습니다.</p>'; return; }
     var vmax = Math.max.apply(null, c.vendors.map(function (v) { return Math.abs(v.diff); }).concat([0.0001]));
     var html = '<div class="card-head"><h3>' + t.rank + '. ' + esc(t.dept) + ' · ' + esc(t.account) + '</h3><span class="pill ' + statusCls(t.status) + '">분기 ' + esc(t.status) + (t.annual ? " · 연간 " + esc(t.annual) : "") + '</span></div>' +
-      '<p class="summary">' + esc(c.summary) + '</p>' +
+      '<p class="summary">' + esc(c.summary) + '</p>' + burnBlock(t.burn) +
       '<div><h3 style="margin-bottom:6px">원인 후보</h3><ul class="cands">' + c.candidates.map(function (k) {
         return '<li>' + (k.strength ? '<span class="pill ' + esc(k.strength) + '">' + esc(k.strength) + '</span>' : '<span></span>') + '<b>' + esc(k.pattern) + '</b><span class="t">' + esc(k.text) + '</span></li>';
       }).join("") + '</ul></div>' +
@@ -477,6 +519,8 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   app.appendChild(el('<footer>TRACE (Trend · Risk · Anomaly · Cause · Expense) · 원인 후보는 규칙 기반 가설입니다. 근거 전표와 담당 부서 확인으로 확정하세요. 원본: TRACE 엑셀 → [대시보드 내보내기]로 생성된 data.js</footer>'));
   if (!app.dataset.wired) { app.dataset.wired = "1"; app.addEventListener("click", function (e) {
     var go = e.target.closest("[data-go]"); if (go) { showTab(go.getAttribute("data-go")); window.scrollTo(0, 0); return; }
+    var bb = e.target.closest("[data-basis]");
+    if (bb) { BASIS = bb.getAttribute("data-basis"); try { localStorage.setItem("trace-basis", BASIS); } catch (x) { /* 저장 불가 */ } var y = window.scrollY; render(window.TRACE_CURRENT); window.scrollTo(0, y); return; }
     var mb = e.target.closest(".seg button[data-m]");
     if (mb) { var card = mb.closest(".card"), m = mb.getAttribute("data-m");
       card.querySelectorAll(".seg button").forEach(function (b) { b.setAttribute("aria-pressed", b === mb ? "true" : "false"); });
@@ -608,7 +652,7 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
       D.monthly = after(cd, "월", ["month", "cur", "prev", "budget"], 1, 12);
       D.depts = after(cd, "부서코드", ["code", "name", "avail", "ytd", "forecast", "rate", "status"]);
       D.status = after(cd, "분기 판정", ["status", "count"], 1, 5);
-      D.accounts = after(cd, "G/L 계정", ["gl", "name", "cur", "prevYear", "diff"]);
+      D.accounts = after(cd, "G/L 계정", ["gl", "name", "cur", "prevYear", "diff", "prevMonth", "qCur", "qPrev", "ytd", "ytdPrev"]);
       D.bs = after(cd, "기간번호", ["p", "period", "assets", "liabilities", "equity", "csm", "invested"], 1, 12);
       D.pl = after(cd, "월", ["month", "niCur", "niPrev", "insCur", "invCur", "expCur", "insPrev"], 2, 12);
       D.burn = after(cd, "고갈 순위", ["rank", "dept", "account", "budget", "ytd", "slope", "icpt", "yearEnd", "tstar", "date", "status", "qdate",
@@ -624,8 +668,11 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
       D.top10 = [];
       for (r = 6; r <= 15; r++) {
         if (!wt["B" + r]) continue;
+        var mine = wt["L" + r] === selKey, cb = String(ca.C6 || "전월"), cz = {};
+        if (mine && cb !== "전월") cz[cb] = causeFromSheet();
         D.top10.push({ rank: wt["A" + r], dept: wt["B" + r], account: wt["C" + r], cur: wt["D" + r], mom: wt["E" + r], yoy: wt["F" + r], status: wt["G" + r], qrate: wt["H" + r], annual: wt["I" + r] || null,
-          signal: wt["J" + r] || null, score: wt["K" + r], comment: wt["M" + r], cause: wt["L" + r] === selKey ? causeFromSheet() : noCause });
+          signal: wt["J" + r] || null, score: wt["K" + r], comment: wt["M" + r], qcur: wt["O" + r], qoq: wt["P" + r], ytd: wt["Q" + r], ytdRate: wt["R" + r],
+          cause: mine && cb === "전월" ? causeFromSheet() : noCause, causes: cz });
       }
       var X = { summary: ia.A5 };
       X.alloc = after(ia, "구분", ["cat", "cur", "prev", "ytd", "share"], 1, 8, /^합계/);
