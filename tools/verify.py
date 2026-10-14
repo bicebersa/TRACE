@@ -58,7 +58,7 @@ def main():
         k = g("변동분석", f"E{r}")
         if k not in VA: continue
         x = VA[k]
-        for col, f in (("F", "F"), ("G", "G"), ("I", "I"), ("P", "P"), ("Q", "Q"), ("U", "U"), ("AA", "AA"), ("AJ", "AJ"), ("AM", "AM"), ("K", "K"), ("L", "L"), ("M", "M"), ("AX", "AX"), ("AY", "AY")):
+        for col, f in (("F", "F"), ("G", "G"), ("I", "I"), ("P", "P"), ("Q", "Q"), ("U", "U"), ("AA", "AA"), ("AJ", "AJ"), ("AM", "AM"), ("K", "K"), ("L", "L"), ("M", "M"), ("AX", "AX"), ("AY", "AY"), ("AZ", "AZ")):
             v = g("변동분석", f"{col}{r}")
             if not isinstance(v, float) or abs(v - x[f]) > 0.06: bad.append(f"변동분석 {k} {col}: {v} vs {x[f]}")
         for col, f in (("W", "W"), ("AO", "AO")):

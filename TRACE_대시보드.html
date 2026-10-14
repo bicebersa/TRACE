@@ -26,6 +26,8 @@ header.top h1 small { font-weight: 500; color: var(--muted); font-family: var(--
 section .watch { grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); }
 @media (max-width: 980px) { section .watch { grid-template-columns: 1fr; } }
 .watch table td.sig { min-width: 104px; } .watch table td:nth-child(2) { min-width: 118px; } .watch .rank { white-space: nowrap; }
+td.r .amt { font-size: 11px; color: var(--muted); font-weight: 400; }
+.arow .d small { color: var(--muted); font-size: 11px; }
 td.r.on, th.r.on { background: color-mix(in srgb, var(--accent-soft) 70%, transparent); font-weight: 700; }
 .seg.basis button { padding: 4px 12px; font-size: 12.5px; }
 .burn-in { display: grid; gap: 8px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--grid); border-radius: 10px; }
@@ -82,7 +84,7 @@ svg .val { fill: var(--ink); font-family: var(--mono); font-size: 10.5px; }
 .btrack .cap { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); }
 .brow .rt { white-space: nowrap; text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 /* 계정별 */
-.arow { display: grid; grid-template-columns: 128px minmax(0, 1fr) 70px; gap: 10px; align-items: center; font-size: 12.5px; }
+.arow { display: grid; grid-template-columns: 128px minmax(0, 1fr) 128px; gap: 10px; align-items: center; font-size: 12.5px; }
 .abars { display: grid; gap: 2px; }
 .abars span { display: block; height: 7px; border-radius: 3px; }
 .abars .c { background: var(--accent); } .abars .p { background: var(--prev); }
@@ -180,6 +182,7 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
     if (!signed) return (v < 0 ? "△" : "") + s;
     return (v > 0 ? "+" : v < 0 ? "−" : "") + s;
   }
+  function samt(v, d) { if (v === null || v === undefined || v === "" || isNaN(v)) return "-"; return (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toLocaleString("ko-KR", { minimumFractionDigits: d === undefined ? 1 : d, maximumFractionDigits: d === undefined ? 1 : d }); }
   function esc(s) { return String(s === null || s === undefined ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   function statusCls(s) { return /부족|초과/.test(s || "") ? "부족" : (s || ""); }
   function el(html) { var t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
@@ -275,14 +278,38 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
     }
     return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(b.dept + " " + b.account + " 누계 실적과 추세선") + '">' + g + '</svg>';
   }
+  // 고갈 추세 기울기 방식: 엑셀 설정 C19가 기본값, 화면에서 바꾸면 여기서 다시 계산 (변동분석 AP~AU와 같은 식)
+  var METHODS = [["연내누적", "연내 누적"], ["최근월", "최근월"], ["최근분기", "최근 3개월"], ["전년추세", "작년 남은 기간"]];
+  var BURN_M = null, CUR_Y = 2026;
+  function burnCalc(b, M) {
+    if (!b || !(b.c1 !== undefined)) return b;
+    var meth = BURN_M || "연내누적", cum = [], i;
+    for (i = 1; i <= 12; i++) cum.push(+b["c" + i] || 0);
+    var cM = cum[M - 1] || 0, n = M + 1, St = M * (M + 1) / 2, Stt = M * (M + 1) * (2 * M + 1) / 6, SC = 0, StC = 0;
+    cum.forEach(function (c, j) { SC += c; StC += (j + 1) * c; });
+    var slope = meth === "최근월" ? cM - (M > 1 ? cum[M - 2] : 0) : meth === "최근분기" ? (cM - (M > 3 ? cum[M - 4] : 0)) / Math.min(3, M)
+      : meth === "전년추세" ? (+b.pySlope || 0) : (n * StC - St * SC) / (n * Stt - St * St);
+    var icpt = meth === "연내누적" ? (SC - slope * St) / n : cM - slope * M;
+    var budget = +b.budget || 0, ytd = +b.ytd || 0, t = (budget <= 0 || ytd >= budget || slope <= 0) ? "" : Math.max(M, (budget - icpt) / slope);
+    var status = budget <= 0 ? (ytd > 0 ? "무예산" : "-") : ytd >= budget ? "이미 소진" : slope <= 0 ? "소진 안 됨" : t <= 12 ? "연내 고갈" : "연내 여유";
+    var date = t === "" ? (status === "이미 소진" ? "소진됨" : "") : new Date(Date.UTC(CUR_Y, 0, 1) + (Math.round(t * 365 / 12) - 1) * 864e5).toISOString().slice(0, 10);
+    var o = {}; for (var k in b) o[k] = b[k];
+    o.slope = slope; o.icpt = icpt; o.yearEnd = icpt + slope * 12; o.tstar = t; o.status = status; o.date = date;
+    return o;
+  }
+  function methodSeg() {
+    return '<span class="seg" role="group" aria-label="기울기 기준">' + METHODS.map(function (x) {
+      return '<button type="button" data-meth="' + x[0] + '" aria-pressed="' + (x[0] === BURN_M) + '">' + x[1] + '</button>'; }).join("") + '</span>';
+  }
+
   // 주의 대상 상세 안의 고갈 추세 (항목별)
   var CUR_M = 12;
   function burnBlock(b) {
     if (!b || b.status === undefined || b.status === null) return "";
+    b = burnCalc(b, CUR_M);
     if (!(+b.budget > 0)) return '<div class="burn-in"><h3>예산 고갈 추세</h3><p class="muted" style="margin:0">' + esc(b.status === "무예산" ? "연간 예산(배정+조정)이 없는 항목입니다." : "연간 예산이 없습니다.") + '</p></div>';
     return '<div class="burn-in"><div class="card-head"><h3>예산 고갈 추세 <span class="pill ' + burnCls(b.status) + '">' + esc(b.status) + '</span></h3>' +
-      '<div class="legend"><span><i style="background:var(--accent)"></i>누계 실적</span><span><i class="line" style="background:var(--accent-ink)"></i>추세선</span><span><i class="line" style="background:var(--budget)"></i>연간가용</span></div></div>' +
-      burnChart(b, CUR_M) +
+      methodSeg() + '</div>' + burnChart(b, CUR_M) +
       '<div class="burn-facts"><span>월 소진속도 <b>' + fmt(b.slope, 1) + '</b></span><span>누계 <b>' + fmt(b.ytd, 1) + '</b> / 가용 <b>' + fmt(b.budget, 1) + '</b></span>' +
       '<span>연간 고갈 <b>' + esc(b.date || "-") + '</b></span><span>분기 고갈 <b>' + esc(b.qdate || "-") + '</b></span></div></div>';
   }
@@ -337,9 +364,10 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
     '<div class="meta"><span class="badge">단위 ' + esc(m.unit) + '</span><span class="badge ' + (ok(m.check) ? "ok" : "ng") + '">자가진단: ' + esc(m.check) + '</span>' +
     '<span class="badge ' + (ok(m.recon) ? "ok" : "ng") + '">3자 대사: ' + esc(m.recon) + '</span><span class="badge">생성: ' + esc(m.generated) + '</span></div></header>'));
 
+  CUR_Y = +String(m.period).slice(0, 4) || CUR_Y;
   var kpiHtml = D.kpi.map(function (k) {
     var sub = k.rate === null || k.rate === undefined ? esc(k.basis) + " " + fmt(k.compare) + "건"
-      : esc(k.basis) + ' 대비 <b class="' + (k.label.indexOf("사업비") === 0 ? (k.rate > 0 ? "up" : "down") : "") + '">' + pct(k.rate, true) + '</b>';
+      : esc(k.basis) + ' 대비 <b class="' + (k.label.indexOf("사업비") === 0 ? (k.rate > 0 ? "up" : "down") : "") + '">' + samt(k.value - k.compare, 0) + ' (' + pct(k.rate, true) + ')</b>';
     return '<div class="kpi"><span class="l">' + esc(k.label) + '</span><span class="v">' + fmt(k.value) + (k.rate === null ? '<span style="font-size:13px">건</span>' : "") + '</span><span class="s">' + sub + '</span></div>';
   }).join("");
   app.appendChild(el(ACTS));
@@ -351,7 +379,11 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   var kparts = kpiHtml.split('<div class="kpi">').slice(1).map(function (h) { return '<div class="kpi">' + h; });
   var kpiBlock = '<div class="kgroups"><div class="kgrp"><span>재무 · 감독원 양식</span><div class="kpis">' + kparts.slice(0, 4).join("") + '</div></div>' +
     '<div class="kgrp"><span>사업비 · 전표 · 예산판</span><div class="kpis">' + kparts.slice(4).join("") + '</div></div></div>';
-  var B = (D.burn || []).filter(function (b) { return b && b.dept; }), Bit = B.filter(function (b) { return b.rank !== "전사"; });
+  if (!BURN_M) BURN_M = (D.meta && D.meta.burnMethod) || "연내누적";
+  var stOrd = function (b) { return b.status === "이미 소진" ? -1 : b.status === "연내 고갈" ? +b.tstar : 99; };
+  var B = (D.burn || []).filter(function (b) { return b && b.dept; }).map(function (b) { return burnCalc(b, CUR_M); });
+  B = B.filter(function (b) { return b.rank === "전사"; }).concat(B.filter(function (b) { return b.rank !== "전사"; }).sort(function (a, b) { return stOrd(a) - stOrd(b); }));
+  var Bit = B.filter(function (b) { return b.rank !== "전사"; });
   var nDep = Bit.filter(function (b) { return b.status === "연내 고갈" || b.status === "이미 소진"; }).length;
   var firstDep = Bit.filter(function (b) { return b.status === "연내 고갈"; })[0];
   var burnNote = B.length ? '<p class="muted" style="font-size:13px;margin:0">선형 추세로 연간 예산이 <b style="color:var(--crit)">연내 바닥나는 부서·계정 ' + nDep + '건</b>' + (firstDep ? ' · 가장 빠른 곳 ' + esc(firstDep.dept) + ' ' + esc(firstDep.account) + ' <b class="num" style="white-space:nowrap">' + esc(firstDep.date) + '</b>' : '') + '</p>' : '';
@@ -384,7 +416,7 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   var accRows = acc.map(function (a) {
     var p = pair(a), r = p[1] > 0 ? p[0] / p[1] - 1 : null;
     return '<div class="arow"><span title="' + esc(a.gl) + ' · ' + esc(bi[1]) + ' ' + fmt(p[0], 1) + ' / ' + esc(bi[2]) + ' ' + fmt(p[1], 1) + '">' + esc(a.name) + '</span><div class="abars"><span class="c" style="width:' + ((p[0] || 0) / amax * 100).toFixed(1) + '%"></span><span class="p" style="width:' + ((p[1] || 0) / amax * 100).toFixed(1) + '%"></span></div>' +
-      '<span class="d ' + (r > 0.2 ? "up" : "") + '">' + (r === null ? (p[0] > 0 ? "신규" : "-") : pct(r, true)) + '</span></div>';
+      '<span class="d ' + (r > 0.2 ? "up" : "") + '">' + samt((p[0] || 0) - (p[1] || 0)) + ' <small>' + (r === null ? (p[0] > 0 ? "신규" : "-") : pct(r, true)) + '</small></span></div>';
   }).join("");
   var accTitle = hasBasis ? "계정별 " + bi[1] + " vs " + bi[2] : "계정별 당월 vs 전년동월", accLeg = hasBasis ? [bi[1], bi[2]] : ["당월", "전년동월"];
   app.appendChild(el('<section data-tab="expense"><div class="sec-head"><span class="eyebrow">TREND · RISK</span><h2>사업비</h2><span class="muted">전표 기준 · 예산 통제는 부서 × 계정 × 분기 한도 (예산판 배정+조정)</span>' + (hasBasis ? '<span style="margin-left:auto">비교 기준 ' + basisSeg() + '</span>' : '') + '</div><div class="grid2">' +
@@ -396,18 +428,19 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
     '<div class="card"><div class="card-head"><h3>분기 한도 판정 분포</h3></div><div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">' + donut(st) +
     '<div style="display:grid;gap:8px">' + st.map(function (s) { return '<div style="display:flex;gap:10px;align-items:center"><span class="pill ' + statusCls(s.status) + '">' + esc(s.status) + '</span><span class="num" style="font-size:16px;font-weight:700">' + s.count + '</span><span class="muted">건</span></div>'; }).join("") +
     '<p class="muted" style="font-size:12px;margin:4px 0 0">분기말 예상 소진율 90% 초과 주의, 100% 초과 초과 예상, 이미 넘으면 한도 초과</p></div></div></div>' +
-    '</div>' + (B.length ? '<div class="card" id="burn"><div class="card-head"><h3>예산 고갈 예상 · 선형 추세</h3><div class="legend"><span><i style="background:var(--accent)"></i>누계 실적</span><span><i class="line" style="background:var(--accent-ink)"></i>추세선</span><span><i class="line" style="background:var(--budget)"></i>연간가용</span></div></div>' +
-    '<p class="muted" style="font-size:12.5px;margin:0">연초 0에서 월별 누계실적까지 직선을 맞춰(최소제곱) 그 직선이 연간가용(배정+조정)에 닿는 날을 고갈 예상일로 봅니다. 분기 고갈 예상일은 이번 분기 경과 개월의 평균 속도로 셉니다.</p>' +
+    '</div>' + (B.length ? '<div class="card" id="burn"><div class="card-head"><h3>예산 고갈 예상 · 선형 추세</h3><span style="font-size:12.5px;color:var(--muted)">기울기 ' + methodSeg() + '</span></div>' +
+    '<div class="legend"><span><i style="background:var(--accent)"></i>누계 실적</span><span><i class="line" style="background:var(--accent-ink)"></i>추세선</span><span><i class="line" style="background:var(--budget)"></i>연간가용</span></div>' +
+    '<p class="muted" style="font-size:12.5px;margin:0">기울기(월 소진속도)로 누계 실적의 직선을 그어 연간가용(배정+조정)에 닿는 날을 고갈 예상일로 봅니다. 연내 누적: 연초~기준월 누계에 맞춘 직선 · 최근월: 당월 사용액 · 최근 3개월: 최근 3개월 평균 · 작년 남은 기간: 작년 같은 남은 달의 월평균. 엑셀 기본값은 설정 시트 C19. 목록은 엑셀에서 고른 기준으로 뽑은 상위 15건입니다.</p>' +
     '<div class="burn"><div style="display:grid;gap:10px;min-width:0"><div id="burn-chart"></div><div class="burn-facts" id="burn-facts"></div></div><div class="burn-list" id="burn-list" role="list"></div></div></div>' : '') +
     '</section>'));
   if (B.length) wireBurn(B, +String(m.period).slice(5, 7) || 12);
 
   // ---------- 주의 대상 + 원인
   var topBasis = D.top10.length && D.top10[0].qoq !== undefined;
-  var rcell = function (v, on) { return '<td class="r ' + (v > 0.2 ? "up" : "") + (on ? " on" : "") + '">' + pct(v, true) + '</td>'; };
+  var rcell = function (v, on, a) { return '<td class="r ' + (v > 0.2 ? "up" : "") + (on ? " on" : "") + '">' + pct(v, true) + (a === undefined ? "" : '<br><span class="amt">' + samt(a) + '</span>') + '</td>'; };
   var rows = D.top10.map(function (t, i) {
     return '<tr class="pick" tabindex="0" data-i="' + i + '" aria-selected="false"><td class="rank">' + t.rank + '</td><td><b>' + esc(t.dept) + '</b><br><span class="sig">' + esc(t.account) + '</span></td>' +
-      '<td class="r">' + fmt(topBasis ? topAmt(t) : t.cur, 1) + '</td>' + (topBasis ? rcell(t.mom, BASIS === "전월") + rcell(t.qoq, BASIS === "전분기") + rcell(t.ytdRate, BASIS === "전년동기누적") : rcell(t.mom, true)) +
+      '<td class="r">' + fmt(topBasis ? topAmt(t) : t.cur, 1) + '</td>' + (topBasis ? rcell(t.mom, BASIS === "전월", t.momAmt) + rcell(t.qoq, BASIS === "전분기", t.qoqAmt) + rcell(t.ytdRate, BASIS === "전년동기누적", t.ytdAmt) : rcell(t.mom, true)) +
       '<td><span class="pill ' + statusCls(t.status) + '">' + esc(t.status) + '</span></td>' +
       '<td class="sig">' + esc(t.signal || "") + '</td><td class="r">' + fmt(t.score, 1) + '</td></tr>';
   }).join("");
@@ -522,6 +555,9 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   app.appendChild(el('<footer>TRACE (Trend · Risk · Anomaly · Cause · Expense) · 원인 후보는 규칙 기반 가설입니다. 근거 전표와 담당 부서 확인으로 확정하세요. 원본: TRACE 엑셀 → [대시보드 내보내기]로 생성된 data.js</footer>'));
   if (!app.dataset.wired) { app.dataset.wired = "1"; app.addEventListener("click", function (e) {
     var go = e.target.closest("[data-go]"); if (go) { showTab(go.getAttribute("data-go")); window.scrollTo(0, 0); return; }
+    var mb2 = e.target.closest("[data-meth]");
+    if (mb2) { BURN_M = mb2.getAttribute("data-meth"); var y2 = window.scrollY, sel = document.querySelector('tr.pick[aria-selected="true"]'), si = sel ? +sel.getAttribute("data-i") : 0;
+      render(window.TRACE_CURRENT); var tr2 = document.querySelector('tr.pick[data-i="' + si + '"]'); if (tr2) tr2.click(); window.scrollTo(0, y2); return; }
     var bb = e.target.closest("[data-basis]");
     if (bb) { BASIS = bb.getAttribute("data-basis"); try { localStorage.setItem("trace-basis", BASIS); } catch (x) { /* 저장 불가 */ } var y = window.scrollY; render(window.TRACE_CURRENT); window.scrollTo(0, y); return; }
     var mb = e.target.closest(".seg button[data-m]");

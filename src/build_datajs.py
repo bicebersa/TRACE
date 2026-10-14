@@ -75,10 +75,16 @@ rank = sorted(VA, key=lambda k: VA[k]["AA"] + VA[k]["row"] / 1e6, reverse=True)[
 # ---------------- 소진 추세 (선형): 점 (0,0)…(M,누계)에 최소제곱 직선 → 연간가용에 닿는 시점
 def xround(x): return math.floor(abs(x) + 0.5) * (1 if x >= 0 else -1)   # 엑셀 ROUND(x,0)
 def dstr(d0, t): return (d0 + dt.timedelta(days=xround(t * 365 / 12) - 1)).isoformat()
-def burn(cum, avail, ytd, qlim, qact):
+BURN_METHOD = os.environ.get("BURN_METHOD", "연내누적")   # 설정 C19와 같음
+def burn(cum, avail, ytd, qlim, qact, pyr=0.0, method=None):
+    method = method or BURN_METHOD
     n = M + 1; St = M * (M + 1) / 2; Stt = M * (M + 1) * (2 * M + 1) / 6
-    SC = sum(cum); StC = sum((i + 1) * c for i, c in enumerate(cum))
-    b = (n * StC - St * SC) / (n * Stt - St ** 2); a = (SC - b * St) / n
+    SC = sum(cum); StC = sum((i + 1) * c for i, c in enumerate(cum)); cM = cum[M - 1]
+    if method == "최근월": b = cM - (cum[M - 2] if M > 1 else 0)
+    elif method == "최근분기": b = (cM - (cum[M - 4] if M > 3 else 0)) / min(3, M)
+    elif method == "전년추세": b = pyr
+    else: b = (n * StC - St * SC) / (n * Stt - St ** 2)
+    a = (SC - b * St) / n if method == "연내누적" else cM - b * M
     t = "" if (avail <= 0 or ytd >= avail or b <= 0) else max(M, (avail - a) / b)
     st = ("무예산" if avail <= 0 and ytd > 0 else "-" if avail <= 0 else "이미 소진" if ytd >= avail else "소진 안 됨" if b <= 0 else "연내 고갈" if t <= 12 else "연내 여유")
     date = ("소진됨" if st == "이미 소진" else "") if t == "" else dstr(dt.date(Y, 1, 1), t)
@@ -91,17 +97,24 @@ def burn(cum, avail, ytd, qlim, qact):
     return dict(slope=b, icpt=a, yearEnd=a + b * 12, tstar=t, date=date, status=st, qdate=qd)
 for k, v in VA.items():
     v["cum"] = [sum(v["mon"][p] for p in range(Y * 12 + 1, Y * 12 + j + 1)) if j <= M else 0 for j in range(1, 13)]
-    v.update(burn(v["cum"], v["P"], v["Q"], v["AJ"], v["AK"]))
+    v["AZ"] = sum(v["mon"][p] for p in range(P - 11, (Y - 1) * 12 + 13)) / max(1, 12 - M)   # 작년 같은 남은 기간 월평균
+    v.update(burn(v["cum"], v["P"], v["Q"], v["AJ"], v["AK"], v["AZ"]))
     v["AW"] = v["row"] / 1e6 + (0 if v["status"] == "이미 소진" else v["tstar"] if v["status"] == "연내 고갈" else 99)
-def burnrow(rank_, dept, account, budget, ytd, b, cum):
+def burnrow(rank_, dept, account, budget, ytd, b, cum, pyr):
     o = dict(rank=rank_, dept=dept, account=account, budget=budget, ytd=ytd, slope=b["slope"], icpt=b["icpt"], yearEnd=b["yearEnd"],
              tstar=b["tstar"], date=b["date"], status=b["status"], qdate=b["qdate"])
-    o.update({f"c{j + 1}": c for j, c in enumerate(cum)}); return o
+    o.update({f"c{j + 1}": c for j, c in enumerate(cum)}); o["pySlope"] = pyr; return o
 tcum = [sum(v["cum"][j] for v in VA.values()) for j in range(12)]
 tav, tytd = sum(v["P"] for v in VA.values()), sum(v["Q"] for v in VA.values())
-burnrows = [burnrow("전사", "전사", "사업비 합계", tav, tytd, burn(tcum, tav, tytd, sum(v["AJ"] for v in VA.values()), sum(v["AK"] for v in VA.values())), tcum)]
+tpyr = sum(e["v"] for e in E if P - 12 < e["p"] <= (Y - 1) * 12 + 12) / max(1, 12 - M)
+burnrows = [burnrow("전사", "전사", "사업비 합계", tav, tytd, burn(tcum, tav, tytd, sum(v["AJ"] for v in VA.values()), sum(v["AK"] for v in VA.values()), tpyr), tcum, tpyr)]
 for i, k in enumerate([k for k in sorted(VA, key=lambda k: VA[k]["AW"]) if VA[k]["AW"] < 99][:15], 1):
-    v = VA[k]; burnrows.append(burnrow(i, DEPTS[v["d"]], GLN[v["gl"]], v["P"], v["Q"], v, v["cum"]))
+    v = VA[k]; burnrows.append(burnrow(i, DEPTS[v["d"]], GLN[v["gl"]], v["P"], v["Q"], v, v["cum"], v["AZ"]))
+
+def burn_note(va):   # 원인분석 F16·G16과 같은 규칙 (선형 추세)
+    short = max(0, va["yearEnd"] - va["P"]) if va["P"] > 0 else 0
+    if va["date"] == "소진됨": return ", 연간 예산 이미 소진"
+    return f", 연간 {t1(short)} 부족 예상 ({va['date']} 고갈)" if short > 0 else ""
 
 # ---------------- 원인분석 (비교 기준: 전월 · 전분기 · 전년동기누적 · 전년동월 — 원인분석 C10~C13과 같은 기간)
 PERIODS = {"전월": (P, P, P - 1, P - 1), "전분기": (QS, P, QS - 3, P - 3), "전년동기누적": (Y * 12 + 1, P, (Y - 1) * 12 + 1, P - 12), "전년동월": (P, P, P - 12, P - 12)}
@@ -174,7 +187,7 @@ def cause(k, basis="전월"):
     va = VA[k]
     summ = (f"{DEPTS[va['d']]} · {GLN[va['gl']]} {basis} 대비 {('+' if C16 > 0 else '') + t1(C16) if C16 != 0 else '0'} ({spct(D16)}). "
             + ("감소 또는 변동 없음 - 원인 후보는 증가 항목에만 만듭니다. " if C16 <= 0 else top + ". ")
-            + f"분기 한도: {va['AO']}" + (f", 연간 {t1(va['X'])} 부족 예상 ({va['Y']} 소진)" if va["X"] > 0 else "") + ".")
+            + f"분기 한도: {va['AO']}" + burn_note(va) + ".")
     ev = sorted(cur, key=lambda e: abs(e["v"]) + e["row"] / 1e9, reverse=True)[:15]
     return dict(basis=basis, summary=summ, curTotal=A16, cmpTotal=B16, diff=C16,
                 candidates=[dict(pattern=c[1], strength=c[2], text=c[3]) for c in cands] or [dict(pattern="뚜렷한 패턴 없음", strength=None, text="근거 전표 목록을 직접 확인하세요")],
@@ -185,10 +198,10 @@ top10 = []
 for i, k in enumerate(rank, 1):
     v = VA[k]
     bw = dict(dept=DEPTS[v["d"]], account=GLN[v["gl"]], ytd=v["Q"], budget=v["P"], slope=v["slope"], icpt=v["icpt"], yearEnd=v["yearEnd"],
-              tstar=v["tstar"], date=v["date"], status=v["status"], qdate=v["qdate"]); bw.update({f"c{j + 1}": c for j, c in enumerate(v["cum"])})
+              tstar=v["tstar"], date=v["date"], status=v["status"], qdate=v["qdate"], pySlope=v["AZ"]); bw.update({f"c{j + 1}": c for j, c in enumerate(v["cum"])})
     top10.append(dict(rank=i, dept=DEPTS[v["d"]], account=GLN[v["gl"]], cur=v["F"], mom=v["H"], yoy=v["J"], status=v["AO"], qrate=v["AN"],
                       annual=v["W"], signal=v["Z"] or None, score=v["AA"], comment=COMMENTS.get(k, "(미확인)"),
-                      qcur=v["K"], qoq=v["M"], ytd=v["Q"], ytdRate=v["AY"], burn=bw,
+                      qcur=v["K"], qoq=v["M"], ytd=v["Q"], ytdRate=v["AY"], momAmt=v["F"] - v["G"], qoqAmt=v["K"] - v["L"], ytdAmt=v["Q"] - v["AX"], burn=bw,
                       cause=cause(k), causes={b: cause(k, b) for b in ("전분기", "전년동기누적")}))
 
 # ---------------- 차트데이터
@@ -295,7 +308,7 @@ summary17 = (f"GMM CSM 당월 변동 {sg(csm_chg, 0)} 중 사업비 관련 {sg(c
 ifrs17 = dict(summary=summary17, alloc=alloc, pf=pfrows, totals=dict(csm=tcsm, csmVfa=tvfa, pl=tpl), recon=recon, bridge=bridge, bridgeVfa=bridgeV,
               csmChange=csm_chg, csmExpense=csm_exp, csmChangeVfa=vcsm_chg, csmExpenseVfa=vcsm_exp, drivers=[{k: v for k, v in d.items() if k != "sk"} for d in drivers], evidence=evidence17)
 
-data = dict(meta=dict(company=os.environ.get("COMPANY", "예시보험㈜"), period=plab(P), unit="백만원", check="전체 정상 (참고 1건)", recon="전체 일치", generated="2026-10-14 (예시 데이터)"),
+data = dict(meta=dict(company=os.environ.get("COMPANY", "예시보험㈜"), period=plab(P), unit="백만원", burnMethod=BURN_METHOD, check="전체 정상 (참고 1건)", recon="전체 일치", generated="2026-10-14 (예시 데이터)"),
             kpi=kpi, monthly=monthly, depts=depts, status=status, accounts=accounts, bs=bsrows, pl=plrows, burn=burnrows, top10=top10, ifrs17=ifrs17)
 def rnd(o):
     if isinstance(o, float): return round(o, 4)
