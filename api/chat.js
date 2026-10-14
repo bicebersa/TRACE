@@ -75,27 +75,30 @@ function upstreamError(status, text) {
   return `OpenRouter 오류 (${status})${msg ? `: ${msg}` : ''}`;
 }
 
+// 키가 없을 때 안내 문구. 연동이 다른 이름으로 키를 넣었거나 환경(Preview/Production) 범위가 다를 때 원인을 바로 보이게 한다. 값은 내보내지 않는다.
+function missingKeyMessage() {
+  // OPNEROUTER처럼 철자가 바뀐 이름도 잡도록 'ROUTER'로 찾는다
+  const similar = Object.keys(process.env).filter((k) => /router/i.test(k));
+  return (
+    `이 배포(${process.env.VERCEL_ENV || '알 수 없음'} 환경, 커밋 ${(process.env.VERCEL_GIT_COMMIT_SHA || '?').slice(0, 7)})에 ` +
+    '환경변수 OPENROUTER_API_KEY가 없습니다. ' +
+    (similar.length ? `비슷한 이름: ${similar.join(', ')}. ` : '') +
+    'Vercel 프로젝트 Settings → Environment Variables에서 이 환경에 키를 넣은 뒤, 그다음에 다시 배포하세요.'
+  );
+}
+
 export function GET() {
   return json({
     models: Object.entries(allowedModels()).map(([id, label]) => ({ id, label })),
     defaultModel: DEFAULT_MODEL,
     needsCode: Boolean(process.env.CHAT_ACCESS_CODE),
+    keyError: process.env.OPENROUTER_API_KEY ? '' : missingKeyMessage(),
   });
 }
 
 export async function POST(request) {
   const key = process.env.OPENROUTER_API_KEY;
-  if (!key) {
-    // 연동이 다른 이름으로 키를 넣었거나 환경(Preview/Production) 범위가 다를 때 원인을 바로 보이게 한다. 값은 내보내지 않는다.
-    // OPNEROUTER처럼 철자가 바뀐 이름도 잡도록 'ROUTER'로 찾는다
-    const similar = Object.keys(process.env).filter((k) => /router/i.test(k));
-    return json({
-      error:
-        `이 배포(${process.env.VERCEL_ENV || '알 수 없음'} 환경)에 환경변수 OPENROUTER_API_KEY가 없습니다. ` +
-        (similar.length ? `비슷한 이름: ${similar.join(', ')}. ` : '') +
-        'Vercel 프로젝트 Settings → Environment Variables에서 이 환경에 키를 넣고 다시 배포하세요.',
-    }, 500);
-  }
+  if (!key) return json({ error: missingKeyMessage() }, 500);
 
   let body;
   try {

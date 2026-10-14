@@ -293,6 +293,7 @@ textarea:focus, input:focus, select:focus { outline: 2px solid var(--accent); ou
     cfg.models.forEach((m) => els.model.add(new Option(m.label, m.id)));
     els.model.value = cfg.models.some((m) => m.id === saved.model) ? saved.model : cfg.defaultModel;
     els.codeRow.hidden = !cfg.needsCode;
+    if (cfg.keyError) addBubble('error', cfg.keyError);
   }).catch(() => addBubble('error', '서버 설정을 불러오지 못했습니다. Vercel에 배포된 주소에서 열었는지 확인하세요.'));
 })();
 </script>
