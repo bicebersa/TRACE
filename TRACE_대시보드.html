@@ -91,6 +91,8 @@ svg .val { fill: var(--ink); font-family: var(--mono); font-size: 10.5px; }
 .arow .d { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .scroll { max-height: 360px; overflow-y: auto; display: grid; gap: 7px; padding-right: 4px; }
 /* 상태 pill */
+.up-amt { color: var(--crit); font-weight: 600; } .pill.warn { background: var(--warn-soft); color: var(--warn); }
+section select, section input[type=number] { font: inherit; font-size: 13px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
 .pill { display: inline-block; font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
 .pill.여유 { background: var(--accent-soft); color: var(--accent); }
 .pill.주의 { background: var(--warn-soft); color: var(--warn); }
@@ -377,6 +379,256 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
   function topAmt(t) { return BASIS === "전월" ? t.cur : BASIS === "전분기" ? t.qcur : t.ytd; }
   function topCause(t) { return BASIS === "전월" ? t.cause : (t.causes && t.causes[BASIS]) || null; }
 
+  // ---------- 예산변동 히스토리 · 연도별 예산 비교 (공통 도우미)
+  function nameMaps(D) {
+    var dn = {}, gn = {};
+    (D.depts || []).forEach(function (d) { dn[d.code] = d.name; });
+    (D.budgetHistory || []).forEach(function (b) { if (b.deptName) dn[b.dept] = b.deptName; });
+    (D.accounts || []).forEach(function (a) { gn[String(a.gl)] = a.name; });
+    return { d: function (c) { return dn[c] || c; }, g: function (c) { return gn[String(c)] || String(c); } };
+  }
+  function bhClassify(fromP, toP, amt, text) {   // 엑셀 예산변경이력 Q·R열과 같은 규칙
+    var t = String(text || ""), type, move = "";
+    if (t.indexOf("전용") >= 0) type = "전용";
+    else if (t.indexOf("반납") >= 0) type = "감액·반납";
+    else if (!toP) type = amt >= 0 ? "추가배정" : "감액·반납";
+    else type = toP === fromP ? "금액 변경" : "집행시기변경";
+    if (toP && fromP && toP !== fromP) {
+      var yq = function (p) { return [Math.floor((p - 1) / 12), Math.floor(((p - 1) % 12) / 3)]; }, a = yq(fromP), b = yq(toP);
+      move = a[0] !== b[0] ? "연도 간" : a[1] !== b[1] ? "분기 간" : "분기 내";
+    }
+    return [type, move];
+  }
+  function perOf(v, y) {   // 3 · 202603 · 날짜 일련번호 · "2026-03" → 기간번호
+    if (v === null || v === undefined || v === "") return null;
+    if (typeof v === "number") {
+      if (v <= 12) return y * 12 + v;
+      if (v >= 190001 && v <= 299912) return Math.floor(v / 100) * 12 + v % 100;
+      var d = new Date(Date.UTC(1899, 11, 30) + Math.round(v) * 864e5); return d.getUTCFullYear() * 12 + d.getUTCMonth() + 1;
+    }
+    var t = String(v).replace(/[-./\s년월]/g, "");
+    if (/^\d{5,6}$/.test(t)) return +t.slice(0, 4) * 12 + +t.slice(4);
+    if (/^\d{1,2}$/.test(t)) return y * 12 + +t;
+    return null;
+  }
+  function plab(p) { return Math.floor((p - 1) / 12) + "-" + String((p - 1) % 12 + 1).padStart(2, "0"); }
+  // 엑셀 첫 시트를 행 배열로 (외부 라이브러리 없이)
+  function bookRows(buf) {
+    if (typeof DecompressionStream === "undefined") return Promise.reject(new Error("이 브라우저는 엑셀 파일 읽기를 지원하지 않습니다. Edge·Chrome 최신 버전을 쓰세요"));
+    var read = readZip(buf), X = new DOMParser(), ss = [];
+    var xml = function (t) { return X.parseFromString(t, "application/xml"); };
+    return Promise.all([read("xl/workbook.xml"), read("xl/_rels/workbook.xml.rels"), read("xl/sharedStrings.xml")]).then(function (r) {
+      if (!r[0]) throw new Error("엑셀 통합문서가 아닙니다");
+      var rmap = {};
+      [].forEach.call(xml(r[1]).getElementsByTagName("Relationship"), function (x) { rmap[x.getAttribute("Id")] = "xl/" + x.getAttribute("Target").replace(/^\/?xl\//, "").replace(/^\//, ""); });
+      var first = xml(r[0]).getElementsByTagName("sheet")[0];
+      if (r[2]) [].forEach.call(xml(r[2]).getElementsByTagName("si"), function (si) { var t = ""; [].forEach.call(si.getElementsByTagName("t"), function (x) { t += x.textContent; }); ss.push(t); });
+      return read(rmap[first.getAttribute("r:id")]);
+    }).then(function (t) {
+      var rows = [];
+      [].forEach.call(X.parseFromString(t, "application/xml").getElementsByTagName("c"), function (c) {
+        var ref = c.getAttribute("r"), m = /^([A-Z]+)(\d+)$/.exec(ref); if (!m) return;
+        var col = 0; for (var i = 0; i < m[1].length; i++) col = col * 26 + m[1].charCodeAt(i) - 64;
+        var ty = c.getAttribute("t"), v = c.getElementsByTagName("v")[0], val = null;
+        if (ty === "s" && v) val = ss[+v.textContent];
+        else if (ty === "str" && v) val = v.textContent;
+        else if (ty === "inlineStr") { val = ""; [].forEach.call(c.getElementsByTagName("t"), function (x) { val += x.textContent; }); }
+        else if (ty !== "e" && v) val = parseFloat(v.textContent);
+        var rr = +m[2] - 1; (rows[rr] = rows[rr] || [])[col - 1] = val;
+      });
+      return rows;
+    });
+  }
+  function findCols(rows, spec) {   // spec: {키: [헤더 이름들]} → 머리글 행과 열 위치 (띄어쓰기·대소문자 무시)
+    var norm = function (s) { return String(s === null || s === undefined ? "" : s).replace(/\s/g, "").toUpperCase(); };
+    for (var r = 0; r < Math.min(rows.length, 15); r++) {
+      var row = (rows[r] || []).map(norm), pos = {}, hit = 0;
+      Object.keys(spec).forEach(function (k) {
+        var i = -1; spec[k].some(function (n) { i = row.indexOf(norm(n)); return i >= 0; });
+        if (i >= 0) { pos[k] = i; hit++; }
+      });
+      if (hit >= 3) return { row: r, pos: pos };
+    }
+    return null;
+  }
+  function filePick(id, label) { return '<label class="btn ghost" style="cursor:pointer">' + esc(label) + '<input type="file" id="' + id + '" accept=".xlsx,.xlsm" hidden></label>'; }
+  var tagOf = function (t) { return t === "추가배정" ? "csm" : t === "감액·반납" ? "pl" : t === "집행시기변경" ? "inv" : ""; };
+
+  // ---------- 예산변동 히스토리
+  function historySection(D) {
+    var N = nameMaps(D), B = (D.budgetHistory || []).slice(), A = (D.actions || []).filter(function (a) { return a.act; });
+    var topKeys = {}; (D.top10 || []).forEach(function (t) { if (t.key) topKeys[t.key] = t.rank; });
+    B.sort(function (a, b) { return String(b.from).localeCompare(String(a.from)); });
+    var sum = function (f) { return B.filter(f).reduce(function (s, b) { return s + (+b.amt || 0); }, 0); };
+    var kp = [["변경 건수", B.length, "건"], ["추가배정", sum(function (b) { return b.type === "추가배정"; })], ["감액·반납", sum(function (b) { return b.type === "감액·반납"; })],
+      ["전용", sum(function (b) { return b.type === "전용"; })], ["집행시기변경", sum(function (b) { return b.type === "집행시기변경"; })],
+      ["분기 간 이동", sum(function (b) { return b.move === "분기 간" || b.move === "연도 간"; })]];
+    var kpis = '<div class="kpis">' + kp.map(function (k) { return '<div class="kpi"><span class="l">' + k[0] + '</span><span class="v">' + fmt(k[1], k[2] ? 0 : 1) + (k[2] ? '<span style="font-size:13px">건</span>' : '') + '</span></div>'; }).join("") + '</div>';
+    var Y = +String(D.meta.period).slice(0, 4), labs = [], add = [], ret = [], out = [], inn = [];
+    for (var m = 1; m <= 12; m++) { labs.push(m + "월"); add.push(0); ret.push(0); out.push(0); inn.push(0); }
+    B.forEach(function (b) {
+      var fp = perOf(b.from, Y), tp = perOf(b.to, Y), a = +b.amt || 0;
+      if (b.type === "집행시기변경") { if (fp && Math.floor((fp - 1) / 12) === Y) out[(fp - 1) % 12] += a; if (tp && Math.floor((tp - 1) / 12) === Y) inn[(tp - 1) % 12] += a; }
+      else if (fp && Math.floor((fp - 1) / 12) === Y) { if (a >= 0) add[(fp - 1) % 12] += a; else ret[(fp - 1) % 12] += -a; }
+    });
+    var depts = {}; B.forEach(function (b) { depts[b.dept] = 1; });
+    var opts = '<option value="">전체 부서</option>' + Object.keys(depts).sort().map(function (d) { return '<option value="' + esc(d) + '">' + esc(N.d(d)) + '</option>'; }).join("");
+    var types = ["추가배정", "감액·반납", "전용", "집행시기변경", "금액 변경"];
+    var topts = '<option value="">전체 구분</option>' + types.map(function (t) { return '<option>' + t + '</option>'; }).join("");
+    var actRows = A.slice().sort(function (a, b) { return String(b.period).localeCompare(String(a.period)); }).map(function (a) {
+      var k = String(a.key || "").split("|");
+      return '<tr><td class="num">' + esc(a.period) + '</td><td>' + esc(N.d(k[0])) + ' · ' + esc(N.g(k[1])) + (topKeys[a.key] ? ' <span class="pill warn">TOP ' + topKeys[a.key] + '</span>' : '') + '</td><td>' + esc(a.cause || "") +
+        '</td><td><b>' + esc(a.act) + '</b></td><td class="r">' + (a.amt ? fmt(a.amt, 1) : "-") + '</td><td class="num">' + (a.q ? a.q + "분기" : "") + '</td><td>' + esc(a.status || "") + '</td><td>' + esc(a.ref || "") + '</td><td>' + esc(a.text || "") + '</td></tr>';
+    }).join("");
+    var sec = el('<section data-tab="history"><div class="sec-head"><span class="eyebrow">BUDGET HISTORY</span><h2>예산변동 히스토리</h2><span class="muted">SAP 예산 변경이력 + 확인된 조치 기록 · 연중에는 배정은 그대로, 조정만 바뀝니다</span>' +
+      '<span style="margin-left:auto">' + filePick("bh-file", "변경이력 파일 불러오기") + '</span></div>' + kpis +
+      '<div class="card" style="margin-top:16px"><div class="card-head"><h3>' + Y + '년 월별 예산 변동</h3><div class="legend"><span><i style="background:var(--csm)"></i>추가배정</span><span><i style="background:var(--pl)"></i>감액·반납</span><span><i style="background:var(--prev)"></i>옮겨 나감</span><span><i style="background:var(--inv)"></i>옮겨 들어옴</span></div></div>' +
+      barChart({ label: "월별 예산 변동", labels: labs, series: [{ name: "추가배정", values: add, color: "var(--csm)" }, { name: "감액·반납", values: ret, color: "var(--pl)" }, { name: "옮겨 나감", values: out, color: "var(--prev)" }, { name: "옮겨 들어옴", values: inn, color: "var(--inv)" }] }) + '</div>' +
+      '<div class="card" style="margin-top:16px"><div class="card-head"><h3>변경 내역</h3><span style="display:flex;gap:8px;margin-left:auto"><select id="bh-dept">' + opts + '</select><select id="bh-type">' + topts + '</select></span></div><div class="tbl-wrap" id="bh-list"></div>' +
+      '<p class="muted" style="font-size:12px;margin-top:8px">구분은 규칙으로 추정합니다: 옮긴월이 없으면 추가배정(+)·감액(−), 텍스트에 \'전용\'·\'반납\'이 있으면 그 구분, 옮긴월이 다르면 집행시기변경. 분기 간 이동은 분기 한도가 바뀝니다. 단위: ' + esc(D.meta.unit) + '</p></div>' +
+      '<div class="card" style="margin-top:16px"><div class="card-head"><h3>조치 기록 (엑셀 코멘트 시트)</h3><span class="muted">예산판 조정은 [예산 조정 → 조치 이력 기록] 버튼으로 자동 기록</span></div><div class="tbl-wrap"><table><thead><tr><th>기간</th><th>부서 · 계정</th><th>원인</th><th>조치</th><th class="r">금액</th><th>분기</th><th>상태</th><th>근거</th><th>내용</th></tr></thead><tbody>' +
+      (actRows || '<tr><td colspan="9" class="muted">조치 기록이 없습니다. 엑셀 코멘트 시트의 J~N열(조치 구분·금액·분기·상태·근거)을 채우세요.</td></tr>') + '</tbody></table></div></div></section>');
+    function list() {
+      var fd = sec.querySelector("#bh-dept").value, ft = sec.querySelector("#bh-type").value;
+      var rows = B.filter(function (b) { return (!fd || b.dept === fd) && (!ft || b.type === ft); });
+      sec.querySelector("#bh-list").innerHTML = '<table><thead><tr><th>예산월</th><th>옮긴월</th><th>부서 · 계정</th><th>구분</th><th>이동 범위</th><th class="r">예산금액</th><th class="r">옮긴 금액</th><th>텍스트</th></tr></thead><tbody>' +
+        (rows.map(function (b) {
+          return '<tr><td class="num">' + esc(b.from || "") + '</td><td class="num">' + esc(b.to || "-") + '</td><td>' + esc(N.d(b.dept)) + ' · ' + esc(N.g(b.gl)) + (topKeys[b.key] ? ' <span class="pill warn">TOP ' + topKeys[b.key] + '</span>' : '') +
+            '</td><td><span class="tag ' + tagOf(b.type) + '">' + esc(b.type) + '</span></td><td>' + esc(b.move || "") + '</td><td class="r">' + fmt(b.fromAmt, 1) + '</td><td class="r ' + (b.amt < 0 ? "neg-amt" : "") + '">' + fmt(b.amt, 1) + '</td><td>' + esc(b.text || "") + '</td></tr>';
+        }).join("") || '<tr><td colspan="8" class="muted">변경이력이 없습니다. [변경이력 파일 불러오기]로 SAP 변경이력 화면에서 내려받은 엑셀을 올리세요.</td></tr>') + '</tbody></table>';
+    }
+    sec.querySelector("#bh-dept").addEventListener("change", list); sec.querySelector("#bh-type").addEventListener("change", list); list();
+    sec.querySelector("#bh-file").addEventListener("change", function (e) {
+      var f = e.target.files[0]; if (!f) return;
+      f.arrayBuffer().then(bookRows).then(function (rows) {
+        var h = findCols(rows, { dept: ["부서코드", "부서", "팀코드"], dname: ["부서명", "팀명"], gl: ["예산계정", "G/L계정", "계정코드", "계정"], from: ["예산월", "예산기간", "월"],
+          famt: ["예산금액", "배정액", "예산"], to: ["옮긴월", "이동월", "변경월"], amt: ["옮긴금액", "이동금액", "변경금액", "금액"], text: ["텍스트", "적요", "사유", "내용", "비고"] });
+        if (!h || h.pos.dept === undefined || h.pos.gl === undefined || h.pos.amt === undefined) throw new Error("부서코드·예산계정·옮긴 금액 열을 찾지 못했습니다");
+        var g = function (row, k) { return h.pos[k] === undefined ? null : row[h.pos[k]]; }, fx = 1e6, out_ = [];
+        rows.slice(h.row + 1).forEach(function (row) {
+          if (!row || g(row, "dept") === null || g(row, "dept") === "") return;
+          var fp = perOf(g(row, "from"), Y), tp = perOf(g(row, "to"), Y), amt = (+g(row, "amt") || 0) / fx, c = bhClassify(fp, tp, amt, g(row, "text"));
+          out_.push({ key: g(row, "dept") + "|" + g(row, "gl"), dept: String(g(row, "dept")), deptName: g(row, "dname"), gl: String(g(row, "gl")), from: fp ? plab(fp) : "", to: tp ? plab(tp) : null,
+            fromAmt: (+g(row, "famt") || 0) / fx, amt: amt, type: c[0], move: c[1], text: g(row, "text") });
+        });
+        var D2 = Object.assign({}, D, { budgetHistory: out_ }); render(D2); showTab("history");
+        setStatus(f.name + " · 변경이력 " + out_.length + "건 반영 (원 단위 파일 → " + D.meta.unit + ")");
+      }).catch(function (err) { setStatus("변경이력 불러오기 실패: " + err.message, true); });
+    });
+    return sec;
+  }
+
+  // ---------- 연도별 예산 비교 (계획 파일 = 그해 배정, 편성 = 배정 + 예비비)
+  var PLAN = null;
+  function planSection(D) {
+    var N = nameMaps(D);
+    if (!PLAN && D.plans) PLAN = JSON.parse(JSON.stringify(D.plans));
+    var P = PLAN || {}, a = P.base, b = P.cmp;
+    var head = '<div class="sec-head"><span class="eyebrow">ANNUAL PLAN</span><h2>연도별 예산 비교</h2><span class="muted">계획 파일(부서 × 계정 × 항목 × 월) = 그해 배정 예산 · 편성 = 배정 + 예비비</span>' +
+      '<span style="margin-left:auto;display:flex;gap:8px">' + filePick("pl-a", "기준 연도 계획 올리기") + filePick("pl-b", "비교 연도 계획 올리기") + '</span></div>';
+    var sec = el('<section data-tab="plan">' + head + '<div id="pl-body"></div></section>');
+    function load(which, f) {
+      f.arrayBuffer().then(bookRows).then(function (rows) {
+        var spec = { dept: ["부서코드", "부서"], gl: ["계정코드", "예산계정", "G/L계정", "계정"], tot: ["총계", "합계", "연간"], nw: ["신규여부", "신규"], cn: ["청라여부", "청라"], item: ["항목", "세부항목", "내역"], basis: ["산출근거", "근거", "산출내역"] };
+        for (var m = 1; m <= 12; m++) spec["m" + m] = [m + "월", String(m).padStart(2, "0") + "월", "M" + m];
+        var h = findCols(rows, spec);
+        if (!h || h.pos.dept === undefined || h.pos.gl === undefined) throw new Error("부서코드·계정코드 열을 찾지 못했습니다");
+        var g = function (row, k) { return h.pos[k] === undefined ? null : row[h.pos[k]]; }, out_ = [];
+        rows.slice(h.row + 1).forEach(function (row) {
+          if (!row || g(row, "dept") === null || g(row, "dept") === "") return;
+          var ms = []; for (var m = 1; m <= 12; m++) ms.push((+g(row, "m" + m) || 0) / 1e6);
+          var tot = ms.reduce(function (s, x) { return s + x; }, 0); if (!tot && g(row, "tot")) tot = +g(row, "tot") / 1e6;
+          var yn = function (v) { return /^(Y|O|예|여|1|TRUE|신규|청라)/i.test(String(v || "").trim()) ? "Y" : "N"; };
+          out_.push({ dept: String(g(row, "dept")), gl: String(g(row, "gl")), m: ms, total: tot, new: yn(g(row, "nw")), cheongna: yn(g(row, "cn")), item: String(g(row, "item") || "(항목 없음)"), basis: String(g(row, "basis") || "") });
+        });
+        var yr = +((/20\d\d/.exec(f.name) || [])[0]) || (which === "base" ? (b ? b.year - 1 : CUR_Y) : (a ? a.year + 1 : CUR_Y + 1));
+        PLAN = PLAN || {}; PLAN[which] = { year: yr, file: f.name, reserve: (PLAN[which] && PLAN[which].reserve) || 0, rows: out_ };
+        draw(); setStatus(f.name + " · " + yr + "년 계획 " + out_.length + "행 반영");
+      }).catch(function (err) { setStatus("계획 파일 불러오기 실패: " + err.message, true); });
+    }
+    var SEL = null;
+    function draw() {
+      var body = sec.querySelector("#pl-body"); a = PLAN && PLAN.base; b = PLAN && PLAN.cmp;
+      if (!a || !b) { body.innerHTML = '<div class="empty"><h2>계획 파일 두 개를 올리세요</h2><p class="muted">열: 부서코드 · 계정코드 · 1월~12월 · 총계 · 신규여부 · 청라여부 · 항목 · 산출근거 (원 단위). 파일 이름에 연도(예: 2027)가 있으면 그 연도로 봅니다.' + (a ? ' 지금 기준 연도: ' + a.year + '년' : '') + (b ? ' 지금 비교 연도: ' + b.year + '년' : '') + '</p></div>'; return; }
+      var sum = function (rows, f) { return rows.filter(f || function () { return true; }).reduce(function (s, r) { return s + r.total; }, 0); };
+      var ta = sum(a.rows), tb = sum(b.rows), ra = +a.reserve || 0, rb = +b.reserve || 0;
+      var grp = function (keyf) {
+        var o = {};
+        a.rows.forEach(function (r) { var k = keyf(r); (o[k] = o[k] || { k: k, a: 0, b: 0, nw: 0, cn: 0 }).a += r.total; });
+        b.rows.forEach(function (r) { var k = keyf(r); var x = (o[k] = o[k] || { k: k, a: 0, b: 0, nw: 0, cn: 0 }); x.b += r.total; if (r.new === "Y") x.nw += r.total; if (r.cheongna === "Y") x.cn += r.total; });
+        return Object.keys(o).map(function (k) { var x = o[k]; x.d = x.b - x.a; return x; }).sort(function (p, q) { return Math.abs(q.d) - Math.abs(p.d); });
+      };
+      var byD = grp(function (r) { return r.dept; }), byG = grp(function (r) { return r.gl; });
+      var ik = function (r) { return r.dept + "|" + r.gl + "|" + r.item; }, items = {};
+      a.rows.forEach(function (r) { var x = (items[ik(r)] = items[ik(r)] || { dept: r.dept, gl: r.gl, item: r.item, a: 0, b: 0, ba: "", bb: "", nw: "N", cn: "N" }); x.a += r.total; x.ba = r.basis; });
+      b.rows.forEach(function (r) { var x = (items[ik(r)] = items[ik(r)] || { dept: r.dept, gl: r.gl, item: r.item, a: 0, b: 0, ba: "", bb: "", nw: "N", cn: "N" }); x.b += r.total; x.bb = r.basis; if (r.new === "Y") x.nw = "Y"; if (r.cheongna === "Y") x.cn = "Y"; });
+      var IT = Object.keys(items).map(function (k) { var x = items[k]; x.d = x.b - x.a; x.kind = !x.a ? "신규" : !x.b ? "폐지" : "증감"; if (x.nw === "Y" && x.a) x.kind = "신규(표시)"; return x; })
+        .sort(function (p, q) { return Math.abs(q.d) - Math.abs(p.d); });
+      var dNew = IT.filter(function (x) { return x.kind === "신규"; }).reduce(function (s, x) { return s + x.d; }, 0),
+        dDrop = IT.filter(function (x) { return x.kind === "폐지"; }).reduce(function (s, x) { return s + x.d; }, 0),
+        dCn = sum(b.rows, function (r) { return r.cheongna === "Y"; }) - sum(a.rows, function (r) { return r.cheongna === "Y"; }), dKeep = tb - ta - dNew - dDrop;
+      var rate = function (x, y) { return y ? x / y - 1 : null; };
+      var top = byD[0], topI = IT[0];
+      var summary = b.year + "년 배정 계획은 " + a.year + "년 대비 " + samt(tb - ta) + " (" + pct(rate(tb, ta), true) + "). 신규 항목 " + samt(dNew) + ", 폐지 항목 " + samt(dDrop) + ", 기존 항목 증감 " + samt(dKeep) +
+        (dCn ? ", 그중 청라 관련 " + samt(dCn) : "") + "." + (top ? " 가장 크게 변한 부서는 " + N.d(top.k) + " (" + samt(top.d) + ")" : "") + (topI ? ", 가장 큰 항목은 " + N.d(topI.dept) + " " + N.g(topI.gl) + " '" + topI.item + "' (" + samt(topI.d) + ")." : ".");
+      var kpis = '<div class="kpis">' +
+        [[a.year + "년 배정", ta, ""], [b.year + "년 배정", tb, '<b class="' + (tb > ta ? "up" : "down") + '">' + samt(tb - ta) + " (" + pct(rate(tb, ta), true) + ")</b>"],
+         [a.year + "년 편성", ta + ra, "예비비 " + fmt(ra, 1)], [b.year + "년 편성", tb + rb, "예비비 " + fmt(rb, 1) + ' <b class="' + (tb + rb > ta + ra ? "up" : "down") + '">' + samt(tb + rb - ta - ra) + "</b>"]]
+          .map(function (k) { return '<div class="kpi"><span class="l">' + k[0] + '</span><span class="v">' + fmt(k[1], 1) + '</span><span class="s">' + k[2] + '</span></div>'; }).join("") + '</div>';
+      var res = '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:10px" class="muted">예비비 (' + esc(D.meta.unit) + '): <label>' + a.year + '년 <input type="number" step="0.1" id="pl-ra" value="' + ra + '" style="width:110px"></label>' +
+        '<label>' + b.year + '년 <input type="number" step="0.1" id="pl-rb" value="' + rb + '" style="width:110px"></label><span>파일: ' + esc(a.file || "") + ' · ' + esc(b.file || "") + '</span></div>';
+      var labs = []; for (var m = 1; m <= 12; m++) labs.push(m + "월");
+      var mon = function (P_) { return labs.map(function (_, i) { return P_.rows.reduce(function (s, r) { return s + (r.m[i] || 0); }, 0); }); };
+      var decomp = [["기존 항목 증감", dKeep, "var(--accent)"], ["신규 항목", dNew, "var(--csm)"], ["폐지 항목", dDrop, "var(--pl)"]];
+      var dmax = Math.max.apply(null, decomp.map(function (x) { return Math.abs(x[1]); }).concat([0.0001]));
+      var tbl = function (rows, kind) {
+        return '<table><thead><tr><th>' + (kind === "d" ? "부서" : "계정") + '</th><th class="r">' + a.year + '</th><th class="r">' + b.year + '</th><th class="r">증감</th><th class="r">증감률</th><th class="r">신규</th><th class="r">청라</th></tr></thead><tbody>' +
+          rows.map(function (x) {
+            return '<tr class="pick" data-k="' + kind + ':' + esc(x.k) + '" tabindex="0"' + (SEL === kind + ":" + x.k ? ' aria-selected="true"' : '') + '><td>' + esc(kind === "d" ? N.d(x.k) : N.g(x.k)) + '</td><td class="r">' + fmt(x.a, 1) + '</td><td class="r">' + fmt(x.b, 1) +
+              '</td><td class="r ' + (x.d > 0 ? "up-amt" : x.d < 0 ? "neg-amt" : "") + '">' + samt(x.d) + '</td><td class="r">' + (x.a ? pct(x.d / x.a, true) : "신규") + '</td><td class="r">' + (x.nw ? fmt(x.nw, 1) : "-") + '</td><td class="r">' + (x.cn ? fmt(x.cn, 1) : "-") + '</td></tr>';
+          }).join("") + '</tbody></table>';
+      };
+      var selItems = IT.filter(function (x) { if (!SEL) return true; var p = SEL.split(":"); return p[0] === "d" ? x.dept === p[1] : x.gl === p[1]; }).slice(0, 12);
+      var selName = SEL ? (SEL[0] === "d" ? N.d(SEL.slice(2)) : N.g(SEL.slice(2))) : "전체";
+      var itemTbl = '<table><thead><tr><th>부서 · 계정</th><th>항목</th><th class="r">' + a.year + '</th><th class="r">' + b.year + '</th><th class="r">증감</th><th>구분</th><th>산출근거 (' + a.year + ' → ' + b.year + ')</th></tr></thead><tbody>' +
+        selItems.map(function (x) {
+          return '<tr><td>' + esc(N.d(x.dept)) + ' · ' + esc(N.g(x.gl)) + '</td><td><b>' + esc(x.item) + '</b>' + (x.cn === "Y" ? ' <span class="tag inv">청라</span>' : '') + '</td><td class="r">' + fmt(x.a, 1) + '</td><td class="r">' + fmt(x.b, 1) +
+            '</td><td class="r ' + (x.d > 0 ? "up-amt" : x.d < 0 ? "neg-amt" : "") + '">' + samt(x.d) + '</td><td><span class="tag ' + (x.kind === "증감" ? "" : x.kind === "폐지" ? "pl" : "csm") + '">' + esc(x.kind) + '</span></td><td style="font-size:12.5px">' +
+            (x.ba && x.bb && x.ba !== x.bb ? esc(x.ba) + ' → <b>' + esc(x.bb) + '</b>' : esc(x.bb || x.ba)) + '</td></tr>';
+        }).join("") + '</tbody></table>';
+      body.innerHTML = kpis + res + '<p class="summary" style="margin-top:12px">' + esc(summary) + '</p>' +
+        '<div class="grid2" style="margin-top:12px"><div class="card"><div class="card-head"><h3>월별 배정 계획</h3><div class="legend"><span><i style="background:var(--prev)"></i>' + a.year + '</span><span><i style="background:var(--accent)"></i>' + b.year + '</span></div></div>' +
+        barChart({ label: "월별 배정 계획", labels: labs, series: [{ name: String(a.year), values: mon(a), color: "var(--prev)" }, { name: String(b.year), values: mon(b), color: "var(--accent)" }] }) + '</div>' +
+        '<div class="card"><div class="card-head"><h3>증감 분해</h3><span class="muted">' + samt(tb - ta) + '</span></div><div style="display:grid;gap:10px;margin-top:8px">' +
+        decomp.map(function (x) { return '<div class="vrow"><span>' + x[0] + '</span><div class="vbar"><i class="' + (x[1] < 0 ? "neg" : "") + '" style="width:' + (Math.abs(x[1]) / dmax * 100).toFixed(1) + '%;background:' + x[2] + '"></i></div><span class="num" style="text-align:right">' + samt(x[1]) + '</span><span></span></div>'; }).join("") +
+        '<div class="vrow"><span>청라 관련 (위에 포함)</span><div class="vbar"><i style="width:' + (Math.abs(dCn) / dmax * 100).toFixed(1) + '%;background:var(--inv)"></i></div><span class="num" style="text-align:right">' + samt(dCn) + '</span><span></span></div></div>' +
+        '<p class="muted" style="font-size:12px;margin-top:10px">신규 = 기준 연도에 없던 항목, 폐지 = 비교 연도에 없는 항목. 항목은 부서 · 계정 · 항목명이 같으면 같은 항목으로 봅니다.</p></div></div>' +
+        '<div class="grid2" style="margin-top:16px"><div class="card tbl-wrap"><div class="card-head"><h3>부서별</h3><span class="muted">행을 누르면 아래에 항목</span></div>' + tbl(byD, "d") + '</div>' +
+        '<div class="card tbl-wrap"><div class="card-head"><h3>계정별</h3><span class="muted">행을 누르면 아래에 항목</span></div>' + tbl(byG, "g") + '</div></div>' +
+        '<div class="card tbl-wrap" style="margin-top:16px"><div class="card-head"><h3>차이가 큰 항목 · ' + esc(selName) + '</h3>' + (SEL ? '<button type="button" class="btn ghost" id="pl-all">전체 보기</button>' : '') + '</div>' + itemTbl + '</div>';
+      body.querySelectorAll("tr.pick").forEach(function (tr) { tr.addEventListener("click", function () { SEL = tr.getAttribute("data-k"); draw(); body.querySelector("#pl-all") && body.querySelector("#pl-all").scrollIntoView({ block: "nearest" }); }); });
+      var all = body.querySelector("#pl-all"); if (all) all.addEventListener("click", function () { SEL = null; draw(); });
+      ["ra", "rb"].forEach(function (id, i) { body.querySelector("#pl-" + id).addEventListener("change", function (e) { PLAN[i ? "cmp" : "base"].reserve = +e.target.value || 0; draw(); }); });
+    }
+    sec.querySelector("#pl-a").addEventListener("change", function (e) { if (e.target.files[0]) load("base", e.target.files[0]); });
+    sec.querySelector("#pl-b").addEventListener("change", function (e) { if (e.target.files[0]) load("cmp", e.target.files[0]); });
+    draw();
+    return sec;
+  }
+
+  // TOP 10 상세: 예산 조정 · 조치 이력
+  function adjBlock(D, t) {
+    if (!t.key && !t.adj) return "";
+    var B = (D.budgetHistory || []).filter(function (b) { return b.key === t.key; }), A = (D.actions || []).filter(function (a) { return a.key === t.key; });
+    var chips = (t.adj || []).map(function (q) { return '<span class="pill' + (q.amt ? ' warn' : '') + '" title="' + esc(q.type || "") + '">' + q.q + '분기 ' + (q.amt ? samt(q.amt) + (q.type ? ' · ' + esc(q.type) : '') : '조정 없음') + '</span>'; }).join(" ");
+    var rows = B.map(function (b) { return { p: b.from, t: '<span class="tag ' + tagOf(b.type) + '">' + esc(b.type) + '</span> ' + esc(b.from) + (b.to && b.to !== b.from ? ' → ' + esc(b.to) : '') + ' <b class="num">' + samt(b.amt) + '</b> · ' + esc(b.text || "") }; })
+      .concat(A.map(function (a) { return { p: a.period, t: (a.act ? '<b>' + esc(a.act) + '</b>' + (a.amt ? ' <b class="num">' + fmt(a.amt, 1) + '</b>' : '') + (a.status ? ' (' + esc(a.status) + ')' : '') + ' · ' : '') + esc(a.period) + ' ' + esc(a.cause || "") + ': ' + esc(a.text || "") }; }))
+      .sort(function (x, y) { return String(y.p).localeCompare(String(x.p)); });
+    return '<div><h3 style="margin-bottom:6px">예산 조정 · 조치 이력</h3><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">' + chips + '</div>' +
+      (rows.length ? '<ul class="hist" style="margin:0;padding-left:18px;display:grid;gap:4px;font-size:13px">' + rows.map(function (r) { return '<li>' + r.t + '</li>'; }).join("") + '</ul>'
+        : '<p class="muted" style="font-size:13px">이 부서·계정의 변경이력·조치 기록이 없습니다.</p>') + '</div>';
+  }
+
   // ---------- 그리기 (불러온 자료로 화면 전체를 다시 그림)
   function render(D) {
   app.innerHTML = "";
@@ -395,7 +647,7 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
     return '<div class="kpi"><span class="l">' + esc(k.label) + '</span><span class="v">' + fmt(k.value) + (k.rate === null ? '<span style="font-size:13px">건</span>' : "") + '</span><span class="s">' + sub + '</span></div>';
   }).join("");
   app.appendChild(el(ACTS));
-  var TABS = [["summary", "요약"], ["expense", "사업비"], ["watch", "주의 대상 · 원인"], ["ifrs17", "IFRS 17"], ["finance", "재무 요약"]];
+  var TABS = [["summary", "요약"], ["expense", "사업비"], ["watch", "주의 대상 · 원인"], ["history", "예산변동 히스토리"], ["plan", "연도별 예산 비교"], ["ifrs17", "IFRS 17"], ["finance", "재무 요약"]];
   var tabBar = el('<div class="tabs" role="tablist">' + TABS.map(function (t) { return '<button type="button" role="tab" data-go="' + t[0] + '" aria-selected="false">' + t[1] + '</button>'; }).join("") + '</div>');
   app.appendChild(tabBar);
   var top3 = D.top10.slice(0, 5).map(function (t) { return '<li><b>' + esc(t.dept) + ' · ' + esc(t.account) + '</b> <span class="pill ' + statusCls(t.status) + '">' + esc(t.status) + '</span><br><span class="sig">' + esc(t.signal || "") + (t.cause && t.cause.candidates && t.cause.candidates[0] ? " · " + esc(t.cause.candidates[0].pattern) : "") + '</span></li>'; }).join("");
@@ -474,6 +726,8 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
     '<th>분기 한도</th><th>신호</th><th class="r">점수</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +
     '<div class="card detail" id="detail" aria-live="polite"></div></div></section>');
   app.appendChild(watch);
+  app.appendChild(historySection(D));
+  app.appendChild(planSection(D));
   function showDetail(i) {
     var t = D.top10[i], c = topBasis ? topCause(t) : t.cause;
     watch.querySelectorAll("tr.pick").forEach(function (tr) { tr.setAttribute("aria-selected", tr.getAttribute("data-i") == i ? "true" : "false"); });
@@ -493,7 +747,7 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
       c.evidence.slice(0, 8).map(function (e) {
         return '<tr><td class="num">' + esc((e.date || "").slice(5)) + '</td><td class="num">' + esc(e.doc) + '</td><td>' + esc(e.type) + '</td><td>' + esc(e.vendor) + '</td><td>' + esc(e.text) + '</td><td class="r ' + (e.amt < 0 ? "neg-amt" : "") + '">' + fmt(e.amt, 1) + '</td></tr>';
       }).join("") + '</tbody></table></div>' +
-      '<p class="comment"><b>확인된 원인:</b> ' + esc(t.comment || "(미확인)") + '</p>';
+      adjBlock(D, t) + '<p class="comment"><b>확인된 원인:</b> ' + esc(t.comment || "(미확인)") + '</p>';
     document.getElementById("detail").innerHTML = html;
   }
   watch.querySelector("tbody").addEventListener("click", function (e) { var tr = e.target.closest("tr.pick"); if (tr) showDetail(+tr.getAttribute("data-i")); });
@@ -756,7 +1010,7 @@ tbody tr.pick:focus-visible { outline: 2px solid var(--accent); outline-offset: 
         var mine = wt["L" + r] === selKey, cb = String(ca.C6 || "전월"), cz = {};
         if (mine && cb !== "전월") cz[cb] = causeFromSheet();
         D.top10.push({ rank: wt["A" + r], dept: wt["B" + r], account: wt["C" + r], cur: wt["D" + r], mom: wt["E" + r], yoy: wt["F" + r], status: wt["G" + r], qrate: wt["H" + r], annual: wt["I" + r] || null,
-          signal: wt["J" + r] || null, score: wt["K" + r], comment: wt["M" + r], qcur: wt["O" + r], qoq: wt["P" + r], ytd: wt["Q" + r], ytdRate: wt["R" + r],
+          signal: wt["J" + r] || null, score: wt["K" + r], comment: wt["M" + r], key: wt["L" + r], adjQ: wt["AQ" + r], adjType: wt["AR" + r], actCount: wt["AS" + r], lastAction: wt["AT" + r], qcur: wt["O" + r], qoq: wt["P" + r], ytd: wt["Q" + r], ytdRate: wt["R" + r],
           cause: mine && cb === "전월" ? causeFromSheet() : noCause, causes: cz });
       }
       var X = { summary: ia.A5 };

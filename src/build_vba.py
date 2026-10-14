@@ -21,7 +21,8 @@ Public Sub FillAllHelpers()
     Application.Calculation = xlCalculationManual
     FillHelpers "전표_원본", 13, 34
     FillHelpers "TB_원본", 9, 11
-    FillHelpers "예산판_원본", 12, 18
+    FillHelpers "예산판_원본", 12, 21
+    FillHelpers "예산변경이력", 10, 18
     FillHelpers "BS_원본", 9, 11
     FillHelpers "PL_원본", 10, 13
     FillHelpers "예정사업비", 9, 12
@@ -62,6 +63,8 @@ Public Sub ExportDashboard()
     js = js & """accounts"": " & RowsJson("차트데이터", {CDD1}, {NGL}, Array("gl", "name", "cur", "prevYear", "diff", "prevMonth", "qCur", "qPrev", "ytd", "ytdPrev")) & "," & vbLf
     js = js & """bs"": " & RowsJson("차트데이터", {CDE1}, 12, Array("p", "period", "assets", "liabilities", "equity", "csm", "invested")) & "," & vbLf
     js = js & """pl"": " & RowsJson("차트데이터", {CDF1}, 12, Array("month", "niCur", "niPrev", "insCur", "invCur", "expCur", "insPrev")) & "," & vbLf
+    js = js & """budgetHistory"": " & BudgetHistoryJson() & "," & vbLf
+    js = js & """actions"": " & ActionsJson() & "," & vbLf
     js = js & """expcat"": " & RowsJson("차트데이터", {CDI1}, 8, Array("cat", "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12", "ytd", "share", "py", "diff", "rate")) & "," & vbLf
     js = js & """burn"": " & RowsJson("차트데이터", {CDH1}, {NBURN1}, Array("rank", "dept", "account", "budget", "ytd", "slope", "icpt", "yearEnd", "tstar", "date", "status", "qdate", _
         "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12", "row", "qlim", "qact", "pySlope")) & "," & vbLf
@@ -154,7 +157,7 @@ Private Function TopItemJson(ByVal k As Long, ByVal causeJs As String, ByVal cau
     Dim w As Worksheet, s As String, wr As Long, j As Long, bk As Variant
     Set w = ThisWorkbook.Worksheets("주의대상")
     wr = 5 + k
-    s = "{""rank"": " & k & ", ""dept"": " & JV(w.Cells(wr, 2).Value) & ", ""account"": " & JV(w.Cells(wr, 3).Value) & _
+    s = "{""rank"": " & k & ", ""key"": " & JV(w.Cells(wr, 12).Value) & ", ""dept"": " & JV(w.Cells(wr, 2).Value) & ", ""account"": " & JV(w.Cells(wr, 3).Value) & _
         ", ""cur"": " & JV(w.Cells(wr, 4).Value) & ", ""mom"": " & JV(w.Cells(wr, 5).Value) & ", ""yoy"": " & JV(w.Cells(wr, 6).Value) & _
         ", ""status"": " & JV(w.Cells(wr, 7).Value) & ", ""qrate"": " & JV(w.Cells(wr, 8).Value) & ", ""annual"": " & JV(w.Cells(wr, 9).Value) & _
         ", ""signal"": " & JV(w.Cells(wr, 10).Value) & ", ""score"": " & JV(w.Cells(wr, 11).Value) & ", ""comment"": " & JV(w.Cells(wr, 13).Value) & _
@@ -170,8 +173,95 @@ Private Function TopItemJson(ByVal k As Long, ByVal causeJs As String, ByVal cau
         s = s & ", ""c" & j & """: " & JV(w.Cells(wr, 26 + j).Value)
     Next j
     s = s & ", ""pySlope"": " & JV(w.Cells(wr, 39).Value)
-    TopItemJson = s & "}, ""cause"": " & causeJs & ", ""causes"": " & causesJs & "}"
+    s = s & "}, ""adjQ"": " & JV(w.Cells(wr, 43).Value) & ", ""adjType"": " & JV(w.Cells(wr, 44).Value) & ", ""actCount"": " & JV(w.Cells(wr, 45).Value) & _
+        ", ""lastAction"": " & JV(w.Cells(wr, 46).Value) & ", ""adj"": " & AdjJson(CStr(w.Cells(wr, 12).Value))
+    TopItemJson = s & ", ""cause"": " & causeJs & ", ""causes"": " & causesJs & "}"
 End Function
+
+' 예산판 분기별 조정 (부서|계정 키, 기준연도) → [{q, amt, type}]
+Private Function AdjJson(ByVal key As String) As String
+    Dim bp As Worksheet, q As Long, k3 As String, m As Variant, s As String, fx As Double
+    Set bp = ThisWorkbook.Worksheets("예산판_원본")
+    fx = ThisWorkbook.Worksheets("설정").Range("C23").Value
+    s = "["
+    For q = 1 To 4
+        k3 = key & "|" & ThisWorkbook.Worksheets("설정").Range("C6").Value & "|" & q
+        m = Application.Match(k3, bp.Range("U5:U5000"), 0)
+        s = s & IIf(q > 1, ", ", "") & "{""q"": " & q & ", ""amt"": " & JV(Application.WorksheetFunction.SumIfs(bp.Range("H5:H5000"), bp.Range("U5:U5000"), k3) * fx) & _
+            ", ""type"": " & IIf(IsError(m), """""", JV(CStr(bp.Cells(4 + IIf(IsError(m), 1, m), 19).Value))) & "}"
+    Next q
+    AdjJson = s & "]"
+End Function
+
+' 예산변경이력 시트 (보조수식 J~R 포함) → 대시보드 예산변동 히스토리
+Private Function BudgetHistoryJson() As String
+    Dim ws As Worksheet, r As Long, last As Long, s As String, n As Long
+    Set ws = ThisWorkbook.Worksheets("예산변경이력")
+    last = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    s = "["
+    For r = 5 To last
+        If CStr(ws.Cells(r, 1).Value) <> "" Then
+            s = s & IIf(n > 0, ", ", "") & "{""key"": " & JV(ws.Cells(r, 10).Value) & ", ""dept"": " & JV(CStr(ws.Cells(r, 1).Value)) & ", ""deptName"": " & JV(ws.Cells(r, 2).Value) & _
+                ", ""gl"": " & JV(CStr(ws.Cells(r, 3).Value)) & ", ""from"": " & JV(ws.Cells(r, 13).Value) & ", ""to"": " & JV(ws.Cells(r, 14).Value) & _
+                ", ""fromAmt"": " & JV(ws.Cells(r, 15).Value) & ", ""amt"": " & JV(ws.Cells(r, 16).Value) & ", ""type"": " & JV(ws.Cells(r, 17).Value) & _
+                ", ""move"": " & JV(ws.Cells(r, 18).Value) & ", ""text"": " & JV(ws.Cells(r, 8).Value) & "}"
+            n = n + 1
+        End If
+    Next r
+    BudgetHistoryJson = s & "]"
+End Function
+
+' 코멘트 시트 (확인된 원인·조치 이력) → 대시보드
+Private Function ActionsJson() As String
+    Dim ws As Worksheet, r As Long, last As Long, s As String, n As Long, fx As Double, a As Variant
+    Set ws = ThisWorkbook.Worksheets("코멘트")
+    fx = ThisWorkbook.Worksheets("설정").Range("C23").Value
+    last = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    s = "["
+    For r = 5 To last
+        If CStr(ws.Cells(r, 1).Value) <> "" Then
+            a = ws.Cells(r, 11).Value
+            If IsEmpty(a) Or a = "" Then a = Empty Else a = a * fx
+            s = s & IIf(n > 0, ", ", "") & "{""period"": " & JV(Format(ws.Cells(r, 1).Value, "0") & "-" & Format(ws.Cells(r, 2).Value, "00")) & ", ""key"": " & JV(ws.Cells(r, 16).Value) & _
+                ", ""cause"": " & JV(ws.Cells(r, 5).Value) & ", ""text"": " & JV(ws.Cells(r, 6).Value) & ", ""who"": " & JV(ws.Cells(r, 7).Value) & _
+                ", ""act"": " & JV(ws.Cells(r, 10).Value) & ", ""amt"": " & JV(a) & ", ""q"": " & JV(ws.Cells(r, 12).Value) & _
+                ", ""status"": " & JV(ws.Cells(r, 13).Value) & ", ""ref"": " & JV(ws.Cells(r, 14).Value) & "}"
+            n = n + 1
+        End If
+    Next r
+    ActionsJson = s & "]"
+End Function
+
+' 예산판 조정 중 코멘트 시트에 조치가 없는 행을 '조치 이력'으로 옮겨 적음 (매월 예산판 불러온 뒤 실행)
+Public Sub RecordAdjustments()
+    Dim bp As Worksheet, cm As Worksheet, st As Worksheet, r As Long, last As Long, nr As Long, n As Long
+    Set bp = ThisWorkbook.Worksheets("예산판_원본"): Set cm = ThisWorkbook.Worksheets("코멘트"): Set st = ThisWorkbook.Worksheets("설정")
+    Application.Calculate
+    last = bp.Cells(bp.Rows.Count, 1).End(xlUp).Row
+    nr = cm.Cells(cm.Rows.Count, 1).End(xlUp).Row + 1
+    If nr < 5 Then nr = 5
+    For r = 5 To last
+        If CStr(bp.Cells(r, 20).Value) = "기록 없음" Then
+            cm.Cells(nr, 1).Value = bp.Cells(r, 13).Value
+            cm.Cells(nr, 2).Value = st.Range("C7").Value
+            cm.Cells(nr, 3).Value = CStr(bp.Cells(r, 2).Value)
+            cm.Cells(nr, 4).NumberFormat = "@"
+            cm.Cells(nr, 4).Value = CStr(bp.Cells(r, 4).Value)
+            cm.Cells(nr, 5).Value = "예산 조정"
+            cm.Cells(nr, 6).Value = "예산판 조정 자동 기록 (" & CStr(bp.Cells(r, 19).Value) & ")"
+            cm.Cells(nr, 7).Value = "TRACE"
+            cm.Cells(nr, 8).Value = Date
+            cm.Cells(nr, 10).Value = CStr(bp.Cells(r, 19).Value)
+            cm.Cells(nr, 11).Value = bp.Cells(r, 8).Value
+            cm.Cells(nr, 12).Value = bp.Cells(r, 14).Value
+            cm.Cells(nr, 13).Value = "승인"
+            cm.Cells(nr, 14).Value = "예산판"
+            nr = nr + 1: n = n + 1
+        End If
+    Next r
+    Application.Calculate
+    MsgBox "예산판 조정 " & n & "건을 코멘트 시트(조치 이력)에 기록했습니다." & vbLf & "구분·상태·근거를 확인해 고쳐 주세요.", vbInformation, "TRACE"
+End Sub
 
 ' 원인분석 시트의 지금 계산 결과 (선택 항목 · 비교 기준 하나)
 Private Function CauseJson(ByVal ca As Worksheet) As String
@@ -294,7 +384,10 @@ End Function
 
 ' ---------------------------------------------------------------- 불러오기 (헤더설정 시트의 헤더 이름으로 열을 찾음)
 Public Sub ImportBudget()
-    ImportSource "예산판_원본", {BP0}, {BPN}, {BPK}, 12, 18
+    ImportSource "예산판_원본", {BP0}, {BPN}, {BPK}, 12, 21
+End Sub
+Public Sub ImportBudgetHistory()
+    ImportSource "예산변경이력", {BH0}, {BHN}, {BHK}, 10, 18
 End Sub
 Public Sub ImportTB()
     ImportSource "TB_원본", {TB0}, {TBN}, {TBK}, 9, 11
@@ -606,16 +699,16 @@ End Sub
 
 ' TRACE_v0.5.xlsm을 열 때 ThisWorkbook.Workbook_Open이 부릅니다. 버튼이 없을 때만 조용히 만듭니다.
 Public Sub EnsureButtons()
-    If ThisWorkbook.Worksheets("설정").Buttons.Count = 0 Then MakeButtons False
+    If ThisWorkbook.Worksheets("설정").Buttons.Count < 12 Then MakeButtons False
 End Sub
 
 Private Sub MakeButtons(ByVal announce As Boolean)
     Dim ws As Worksheet, b As Object, specs As Variant, i As Long, t As Double, l As Double
     Set ws = ThisWorkbook.Worksheets("설정")
     For Each b In ws.Buttons: b.Delete: Next b
-    specs = Array("예산판 불러오기", "ImportBudget", "TB 불러오기", "ImportTB", "전표 불러오기", "ImportJournal", "BS 불러오기", "ImportBS", "PL 불러오기", "ImportPL", _
+    specs = Array("예산판 불러오기", "ImportBudget", "예산변경이력 불러오기", "ImportBudgetHistory", "TB 불러오기", "ImportTB", "전표 불러오기", "ImportJournal", "BS 불러오기", "ImportBS", "PL 불러오기", "ImportPL", _
                   "예정사업비 불러오기", "ImportExpected", "부채변동표 불러오기", "ImportRoll", _
-                  "보조수식 다시 채우기", "FillAllHelpers", "대시보드 내보내기 (data.js)", "ExportDashboard", "리포트 PDF", "ExportReportPdf")
+                  "보조수식 다시 채우기", "FillAllHelpers", "예산 조정 → 조치 이력 기록", "RecordAdjustments", "대시보드 내보내기 (data.js)", "ExportDashboard", "리포트 PDF", "ExportReportPdf")
     l = ws.Range("I5").Left: t = ws.Range("I5").Top
     ws.Range("I4").Value = "매크로 버튼"
     For i = 0 To UBound(specs) Step 2
@@ -624,7 +717,7 @@ Private Sub MakeButtons(ByVal announce As Boolean)
         b.OnAction = specs(i + 1)
         t = t + 32
     Next i
-    If announce Then MsgBox "버튼 10개를 만들었습니다. 파일 형식을 'Excel 매크로 사용 통합 문서(*.xlsm)'로 저장하세요.", vbInformation, "TRACE"
+    If announce Then MsgBox "버튼 12개를 만들었습니다. 파일 형식을 'Excel 매크로 사용 통합 문서(*.xlsm)'로 저장하세요.", vbInformation, "TRACE"
 End Sub
 '''
 FMX = D["FM"]
@@ -633,7 +726,7 @@ for k_, v_ in {"{SUMR}": IFL["SUMR"], "{A01}": IFL["A0"] + 1, "{B01}": IFL["B0"]
                "{BT2}": IFL["BT"] + 2, "{C01}": IFL["C0"] + 1, "{NREC}": IFL["C1"] - IFL["C0"], "{D01}": IFL["D0"] + 1, "{NFAC}": IFL["D1"] - IFL["D0"],
                "{D11}": IFL["D1"] + 1, "{D12}": IFL["D1"] + 2, "{DV01}": IFL["DV0"] + 1, "{DV11}": IFL["DV1"] + 1, "{DV12}": IFL["DV1"] + 2, "{E01}": IFL["E0"] + 1, "{F01}": IFL["F0"] + 1}.items():
     VBA = VBA.replace(k_, str(v_))
-for tag, nm in (("BP", "예산판_원본"), ("TB", "TB_원본"), ("JE", "전표_원본"), ("BS", "BS_원본"), ("PL", "PL_원본"), ("EX", "예정사업비"), ("RF", "부채변동표")):
+for tag, nm in (("BH", "예산변경이력"), ("BP", "예산판_원본"), ("TB", "TB_원본"), ("JE", "전표_원본"), ("BS", "BS_원본"), ("PL", "PL_원본"), ("EX", "예정사업비"), ("RF", "부채변동표")):
     VBA = VBA.replace("{" + tag + "0}", str(FMX[nm][0])).replace("{" + tag + "N}", str(FMX[nm][1])).replace("{" + tag + "K}", str(FMX[nm][2]))
 rep = {"{CDG1}": CD["CDG"] + 1, "{NKPI}": CD["NKPI"], "{CDA1}": CD["CDA"] + 1, "{CDB1}": CD["CDB"] + 1, "{NDEPT}": CD["NDEPT"],
        "{CDC1}": CD["CDC"] + 1, "{CDD1}": CD["CDD"] + 1, "{NGL}": CD["NGL"], "{CDE1}": CD["CDE"] + 1, "{CDF1}": CD["CDF"] + 1, "{CDH1}": CD["CDH"] + 1, "{CDI1}": CD["CDI"] + 1, "{NBURN1}": CD["NBURN"] + 1, "{AT}": AT}

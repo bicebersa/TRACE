@@ -216,6 +216,20 @@ for e in E:
     vc(e["vname"])
 
 ADJ = {("D700", "63002000", 3): 50 * MIL, ("D300", "62802000", 3): -20 * MIL}
+# 예산 변경이력 (SAP 변경이력 화면): 부서, 계정, 예산월, 옮긴월(없으면 추가배정·반납), 옮긴 금액(원), 텍스트 — 예산판 3분기 조정(ADJ)과 맞춤
+BHIST = [("D500", "62701000", (2025, 12), (2025, 9), 90 * MIL, "가을 캠페인 일정 앞당김 (4분기 → 3분기)"),
+         ("D800", "62902000", (2025, 6), (2025, 7), 12 * MIL, "콜센터 위탁 계약 갱신 지연"),
+         ("D400", "62901000", (2025, 11), (2025, 12), 15 * MIL, "상품 자문 용역 종료월 변경"),
+         ("D100", "62501000", (2026, 4), (2026, 5), 2 * MIL, "경영전략 회의 일정 변경"),
+         ("D700", "63002000", (2026, 7), None, 50 * MIL, "클라우드 사용 단가 인상분 추가배정"),
+         ("D300", "62802000", (2026, 8), None, -20 * MIL, "외부위탁교육 일부 취소, 예산 반납"),
+         ("D600", "63201000", (2026, 8), (2026, 9), 8 * MIL, "8월 차량 정비비 청구 지연분 9월로 이동"),
+         ("D900", "63501000", (2026, 9), (2026, 9), 30 * MIL, "신상품 GA 판매시책 예산 증액 검토 (같은 달 금액 변경)")]
+# 확인된 원인·조치 이력 (코멘트 시트): 연도, 월, 부서, 계정, 원인 유형, 내용, 작성자, 작성일, 조치 구분, 조치 금액(원), 대상 분기, 상태, 근거
+CMTS = [(2026, 6, "D700", "63002000", "단가 인상", "클라우드 사용 단가 인상 확인. 3분기 추가배정 신청해 승인받음", "IT운영팀 박OO", dt.date(2026, 6, 20), "추가배정", 50 * MIL, 3, "승인", "품의 2026-0614"),
+        (2026, 8, "D600", "63201000", "계상 시점 이동", "8월 정비비 청구 지연. 9월에 2개월치 계상 예정이라 예산 조치 없음", "영업지원팀 최OO", dt.date(2026, 8, 29), "조치 없음", None, 3, "완료", ""),
+        (2026, 9, "D500", "62701000", "일회성 대형", "3분기 신상품 TV캠페인 집행을 앞당김. 4분기 집행분에서 조정 예정", "마케팅팀 김OO", dt.date(2026, 10, 8), "집행시기변경", None, 4, "신청", "품의 2026-0921"),
+        (2026, 9, "D200", "62901000", "재분류", "8월 경영기획팀에 잘못 귀속된 회계자문료를 재분류. 실제 증가 아님", "재무회계팀 이OO", dt.date(2026, 10, 8), "조치 없음", None, None, "완료", "")]
 def actual(d, gl, y, months):
     return sum(e["amt"] for e in E if e["d"] == d and e["gl"] == gl and e["y"] == y and e["m"] in months)
 BP = []  # 예산판 행
@@ -464,7 +478,7 @@ tb.freeze_panes = "A5"; widths(tb, [8, 5, 11, 22, 15, 13, 15, 2, 8, 10, 11])
 bp = wb.create_sheet("예산판_원본")
 title(bp, "예산판 원본 (부서 × 계정 × 분기)", "A~J: 붙여넣기 · L~R: 보조수식 · 분기는 1~4, Q1, 1분기 모두 인식")
 header(bp, 4, BP_HDR)
-header(bp, 4, ["키", "연도", "분기", "가용\n(보고단위)", "실적\n(보고단위)", "목록포함", "G/L텍스트"], start=12, fill=GRAYH)
+header(bp, 4, ["키", "연도", "분기", "가용\n(보고단위)", "실적\n(보고단위)", "목록포함", "G/L텍스트", "조정\n추정 구분", "조치 기록", "키|연도|분기"], start=12, fill=GRAYH)
 for k, row in enumerate(BP):
     for j, v in enumerate(row):
         c = bp.cell(row=5 + k, column=j + 1, value=v); c.font = F(BLUE)
@@ -474,11 +488,45 @@ for r in range(5, BP_FILL + 1):
     fm = [f'=IF($A{r}="","",$B{r}&"|"&$D{r})', f'=IF($A{r}="","",VALUE($A{r}&""))',
           f'=IF($A{r}="","",VALUE(SUBSTITUTE(SUBSTITUTE(SUBSTITUTE(UPPER($F{r}&""),"Q",""),"분기","")," ","")))',
           f'=IF($A{r}="",0,($G{r}+$H{r})*{S["fx"]})', f'=IF($A{r}="",0,$I{r}*{S["fx"]})',
-          f'=IF($A{r}="","",IF(COUNTIF({VR("E")},L{r})>0,"Y","N"))', f'=IF($A{r}="","",$D{r}&"")']
+          f'=IF($A{r}="","",IF(COUNTIF({VR("E")},L{r})>0,"Y","N"))', f'=IF($A{r}="","",$D{r}&"")',
+          # 조정 추정: 같은 부서·계정의 연간 조정 합이 0이면 분기 간 이동(집행시기변경), 같은 분기에 반대 금액이 있으면 전용, 아니면 추가배정·감액
+          f'=IF($A{r}="","",IF(N($H{r})=0,"",IF(ABS(SUMIFS({BR("H")},{BR("L")},$L{r},{BR("M")},$M{r}))<1,"집행시기변경",'
+          f'IF(COUNTIFS({BR("M")},$M{r},{BR("N")},$N{r},{BR("H")},-$H{r})>0,IF($H{r}>0,"전용(받음)","전용(보냄)"),IF($H{r}>0,"추가배정","감액·반납")))))',
+          f'=IF(S{r}="","",IF(COUNTIF(코멘트!$Q$5:$Q$2004,$U{r})>0,"기록됨","기록 없음"))',
+          f'=IF($A{r}="","",$L{r}&"|"&$M{r}&"|"&$N{r})']
     for j, f_ in enumerate(fm):
-        c = bp.cell(row=r, column=12 + j, value=f_); c.font = F(GREEN if j in (3, 4, 5) else BLACK)
+        c = bp.cell(row=r, column=12 + j, value=f_); c.font = F(GREEN if j in (3, 4, 5, 8) else BLACK)
         if j in (3, 4): c.number_format = NUM
-bp.freeze_panes = "A5"; widths(bp, [8, 9, 12, 11, 20, 6, 14, 12, 14, 14, 2, 15, 6, 5, 11, 11, 8, 10])
+bp.conditional_formatting.add(f"T5:T{BP_END}", CellIsRule(operator="equal", formula=['"기록 없음"'], fill=PatternFill("solid", fgColor="FFE699")))
+bp.freeze_panes = "A5"; widths(bp, [8, 9, 12, 11, 20, 6, 14, 12, 14, 14, 2, 15, 6, 5, 11, 11, 8, 10, 12, 10, 20])
+
+# =================================================================== 예산변경이력 (SAP 변경이력 화면)
+BH_END = 5000; BHR = lambda c: f"예산변경이력!${c}$5:${c}${BH_END}"
+bh = wb.create_sheet("예산변경이력")
+title(bh, "예산 변경이력 (추가배정 · 전용 · 집행시기변경)", "A~H: 붙여넣기 또는 [예산변경이력 불러오기] · J~R: 보조수식 · 옮긴월이 비면 추가배정·반납, 텍스트에 '전용'·'반납'이 있으면 그 구분")
+BH_HDR = ["부서코드", "부서명", "예산계정", "예산월", "예산금액", "옮긴월", "옮긴 금액", "텍스트"]
+header(bh, 4, BH_HDR)
+header(bh, 4, ["부서|계정", "예산월\n기간번호", "옮긴월\n기간번호", "예산월", "옮긴월", "예산금액\n(보고단위)", "옮긴 금액\n(보고단위)", "구분 추정", "이동 범위"], start=10, fill=GRAYH, h=30)
+for k, (d_, g_, fr, to, amt, txt) in enumerate(BHIST):
+    r = 5 + k
+    for j, v in enumerate([d_, DEPTS[d_], g_, f"{fr[0]}-{fr[1]:02d}", bud_gl.get((d_, g_), [0] * 12)[fr[1] - 1], f"{to[0]}-{to[1]:02d}" if to else None, amt, txt]):
+        c = put(bh, r, j + 1, v, BLUE, "#,##0" if j in (4, 6) else ("@" if j in (0, 2, 3, 5) else None), align="center" if j in (0, 2, 3, 5) else None)
+def bh_per(x):   # 예산월 값 → 기간번호 (3, 202603, 날짜, "2026-03", "2026.3" 모두)
+    t = f'SUBSTITUTE(SUBSTITUTE(SUBSTITUTE({x}&"","-",""),".",""),"/","")'
+    return (f'IF(ISNUMBER({x}),IF({x}<=12,{S["yr"]}*12+{x},IF(AND({x}>=190001,{x}<=299912),INT({x}/100)*12+MOD({x},100),YEAR({x})*12+MONTH({x}))),'
+            f'IFERROR(VALUE(LEFT({t},4))*12+VALUE(MID({t},5,2)),""))')
+BH_FILL = max(4 + len(BHIST), 4)
+for r in range(5, BH_FILL + 1):
+    fm = [f'=IF($A{r}="","",$A{r}&"|"&$C{r}&"")', f'=IF($A{r}="","",{bh_per(f"$D{r}")})', f'=IF(OR($A{r}="",$F{r}=""),"",{bh_per(f"$F{r}")})',
+          f'=IF(K{r}="","",{plabel(f"K{r}")})', f'=IF(L{r}="","",{plabel(f"L{r}")})',
+          f'=IF($A{r}="",0,N($E{r})*{S["fx"]})', f'=IF($A{r}="",0,N($G{r})*{S["fx"]})',
+          f'=IF($A{r}="","",IF(ISNUMBER(SEARCH("전용",$H{r}&"")),"전용",IF(ISNUMBER(SEARCH("반납",$H{r}&"")),"감액·반납",IF(L{r}="",IF(N($G{r})>=0,"추가배정","감액·반납"),IF(L{r}=K{r},"금액 변경","집행시기변경")))))',
+          f'=IF(OR(K{r}="",L{r}=""),"",IF(L{r}=K{r},"",IF(INT((K{r}-1)/12)<>INT((L{r}-1)/12),"연도 간",IF(INT(MOD(K{r}-1,12)/3)<>INT(MOD(L{r}-1,12)/3),"분기 간","분기 내"))))']
+    for j, f_ in enumerate(fm):
+        c = bh.cell(row=r, column=10 + j, value=f_); c.font = F(GREEN if j in (5, 6) else BLACK)
+        if j in (5, 6): c.number_format = NUM
+        if j in (1, 2): c.number_format = "0"
+bh.freeze_panes = "A5"; bh.auto_filter.ref = "A4:R4"; widths(bh, [9, 12, 11, 9, 13, 9, 13, 44, 2, 15, 8, 8, 9, 9, 11, 11, 11, 9])
 
 # ---- 소진 추세 (선형). 점 (0,0), (1,누계1월) … (M,누계M월)에 최소제곱 직선 C(t)=α+βt → 연간가용에 닿는 t* = (가용−α)/β
 def datestr(x):  # 날짜 일련번호 → "2026-11-17" (TEXT 날짜 서식은 지역 설정에 따라 달라 직접 조립)
@@ -671,21 +719,30 @@ av.conditional_formatting.add(f"P6:P{AT}", CellIsRule(operator="equal", formula=
 
 # =================================================================== 코멘트
 cm = wb.create_sheet("코멘트")
-title(cm, "확인된 원인·조치", "담당 부서 확인 결과를 월별로 누적 · 기준연도·기준월이 같은 코멘트가 주의대상·리포트에 표시")
+title(cm, "확인된 원인·조치 이력", "담당 부서 확인 결과와 예산 조치를 월별로 누적 (지우지 말고 계속 아래에 추가) · 기준연도·기준월 코멘트가 주의대상에, 조치 이력은 대시보드 상세에 표시")
 header(cm, 4, ["연도", "월", "부서코드", "G/L 계정", "원인 유형", "확인된 원인·조치", "작성자", "작성일"])
 header(cm, 4, ["키"], start=9, fill=GRAYH)
-CMTS = [("D500", "62701000", "일회성 대형", "3분기 신상품 TV캠페인 집행을 앞당김. 4분기 집행분에서 조정 예정", "마케팅팀 김OO"),
-        ("D200", "62901000", "재분류", "8월 경영기획팀에 잘못 귀속된 회계자문료를 재분류. 실제 증가 아님", "재무회계팀 이OO")]
-for k, (d, gl, t_, txt, who) in enumerate(CMTS):
+header(cm, 4, ["조치 구분", "조치 금액\n(원본 단위)", "대상 분기", "상태", "근거\n(품의번호 등)"], start=10, h=30)
+header(cm, 4, ["기간번호", "부서|계정", "조치키", "최근순", "조치 요약"], start=15, fill=GRAYH, h=30)
+for k, rw in enumerate(CMTS):
     r = 5 + k
-    for j, v in enumerate([Y, M, d, gl, t_, txt, who, dt.date(2026, 10, 8)]):
-        c = put(cm, r, j + 1, v, BLUE, "yyyy-mm-dd" if j == 7 else None, align="center" if j < 5 else None)
+    for j, v in enumerate(rw):
+        c = put(cm, r, j + 1 if j < 8 else j + 2, v, BLUE, "yyyy-mm-dd" if j == 7 else ("#,##0" if j == 9 else None), align="center" if j < 5 or j in (8, 10, 11) else None)
         if j == 3: c.number_format = "@"
-dv = DataValidation(type="list", formula1='"일회성 대형,신규 거래처,단가 인상,계상 시점 이동,정정·역분개,재분류,연간 일괄 계상,물량 증가,기타"', allow_blank=True)
+dv = DataValidation(type="list", formula1='"일회성 대형,신규 거래처,단가 인상,계상 시점 이동,정정·역분개,재분류,연간 일괄 계상,물량 증가,예산 조정,기타"', allow_blank=True)
 cm.add_data_validation(dv); dv.add("E5:E2004")
+dv = DataValidation(type="list", formula1='"추가배정,전용(받음),전용(보냄),집행시기변경,감액·반납,예산 내 흡수,조치 없음,기타"', allow_blank=True); cm.add_data_validation(dv); dv.add("J5:J2004")
+dv = DataValidation(type="whole", operator="between", formula1="1", formula2="4", allow_blank=True); cm.add_data_validation(dv); dv.add("L5:L2004")
+dv = DataValidation(type="list", formula1='"신청,승인,반려,완료"', allow_blank=True); cm.add_data_validation(dv); dv.add("M5:M2004")
 for r in range(5, 2005):
-    cm.cell(row=r, column=9, value=f'=IF($A{r}="","",$A{r}&"|"&$B{r}&"|"&$C{r}&"|"&$D{r})').font = F(GRAY)
-cm.freeze_panes = "A5"; widths(cm, [7, 5, 9, 11, 14, 60, 16, 11, 22])
+    for c_, f_ in ((9, f'=IF($A{r}="","",$A{r}&"|"&$B{r}&"|"&$C{r}&"|"&$D{r})'),
+                   (15, f'=IF($A{r}="",0,$A{r}*12+$B{r})'),
+                   (16, f'=IF($A{r}="","",$C{r}&"|"&$D{r})'),
+                   (17, f'=IF(OR($A{r}="",$J{r}="",$L{r}=""),"",$C{r}&"|"&$D{r}&"|"&$A{r}&"|"&$L{r})'),
+                   (18, f'=IF(OR($A{r}="",$J{r}=""),0,O{r}+ROW()/100000)'),
+                   (19, f'=IF(OR($A{r}="",$J{r}=""),"",{plabel(f"O{r}")}&" "&$J{r}&IF(N($K{r})=0,""," "&TEXT($K{r}*{S["fx"]},"#,##0.0"))&IF($M{r}="",""," ("&$M{r}&")"))')):
+        cm.cell(row=r, column=c_, value=f_).font = F(GRAY)
+cm.freeze_panes = "A5"; widths(cm, [7, 5, 9, 11, 14, 60, 16, 11, 22, 13, 13, 8, 8, 16, 8, 15, 22, 9, 30])
 
 # =================================================================== 키워드사전
 kw = wb.create_sheet("키워드사전")
@@ -896,6 +953,8 @@ header(wt, 5, ["행"], start=14, fill=GRAYH, h=32)
 header(wt, 5, ["당분기", "전분기\n대비", "당해\n누계", "전년동기\n누계 대비"], start=15, h=32)
 header(wt, 5, ["연간가용", "월 소진속도", "절편", "추세\n연말 누계", "고갈\n예상(개월)", "고갈\n예상일", "추세 판정", "분기 고갈\n예상일"] + [f"누계\n{m}월" for m in range(1, 13)] + ["전년 남은기간\n월평균"], start=19, fill=GRAYH, h=32)
 header(wt, 5, ["전월\n증감액", "전분기\n증감액", "전년동기누계\n증감액"], start=40, h=32)
+header(wt, 5, ["당분기\n예산 조정", "조정\n추정 구분", "조치 이력\n(건)", "최근 조치"], start=43, h=32)
+header(wt, 5, ["최근순"], start=47, fill=GRAYH, h=32)
 wt.cell(row=4, column=19, value="고갈 추세 (대시보드 주의 대상 상세 그래프용)").font = F(GRAY, size=9)
 for k in range(1, 11):
     r = 5 + k
@@ -909,11 +968,17 @@ for k in range(1, 11):
         put(wt, r, 27 + j, f'=IF($N{r}="","",INDEX(월별집계!${CL(28 + j)}$7:${CL(28 + j)}${VA_END},$N{r}))', GREEN, NUM)
     for c, a_, b_ in ((40, "F", "G"), (41, "K", "L"), (42, "Q", "AX")):   # 증감액 (전월 · 전분기 · 전년동기누계)
         put(wt, r, c, f'=IF($N{r}="","",INDEX({VR(a_)},$N{r})-INDEX({VR(b_)},$N{r}))', GREEN, NUM)
+    qkey = f'$L{r}&"|"&{S["yr"]}&"|"&{S["Q"]}'
+    put(wt, r, 43, f'=IF($L{r}="","",SUMIFS({BR("H")},{BR("U")},{qkey})*{S["fx"]})', GREEN, NUM)
+    put(wt, r, 44, f'=IF($L{r}="","",IFERROR(INDEX({BR("S")},MATCH({qkey},{BR("U")},0))&"",""))', GREEN, align="center")
+    put(wt, r, 45, f'=IF($L{r}="","",COUNTIF(코멘트!$P$5:$P$2004,$L{r}))', GREEN, "0", align="center")
+    put(wt, r, 47, f'=IF($L{r}="",0,SUMPRODUCT(MAX((코멘트!$P$5:$P$2004=$L{r})*코멘트!$R$5:$R$2004)))', GRAY, "0.00000")
+    put(wt, r, 46, f'=IF(N($AU{r})=0,"",INDEX(코멘트!$S$5:$S$2004,MATCH($AU{r},코멘트!$R$5:$R$2004,0)))', GREEN)
     put(wt, r, 13, f'=IF($L{r}="","",IFERROR(INDEX(코멘트!$F$5:$F$2004,MATCH({S["yr"]}&"|"&{S["mon"]}&"|"&$L{r},코멘트!$I$5:$I$2004,0)),"(미확인)"))', GREEN, wrap=True)
     wt.row_dimensions[r].height = 30
 for val, fill in (('"한도 초과"', "F8CBAD"), ('"초과 예상"', "FCE4D6"), ('"부족 예상"', "F8CBAD"), ('"주의"', "FFE699"), ('"무예산"', "D9C3E9")):
     wt.conditional_formatting.add("G6:G15", CellIsRule(operator="equal", formula=[val], fill=PatternFill("solid", fgColor=fill)))
-widths(wt, [6, 12, 18, 9, 8, 9, 10, 9, 8, 22, 6, 4, 50, 5, 9, 8, 10, 9] + [9] * 21 + [10, 10, 12])
+widths(wt, [6, 12, 18, 9, 8, 9, 10, 9, 8, 22, 6, 4, 50, 5, 9, 8, 10, 9] + [9] * 21 + [10, 10, 12, 10, 12, 8, 30, 8])
 wt.column_dimensions["L"].hidden = True
 wt.freeze_panes = "A6"
 
@@ -1024,6 +1089,10 @@ FORM = [  # (원본 시트, 표준 열 목록[(열, 필수, 대체 이름, 없�
                    ("포트폴리오명", "선택", "", ""), ("측정모형", "필수", "모형,측정방법", "GMM·PAA·VFA"),
                    ("변동요인코드", "필수", "요인코드,코드", "없으면 변동요인명으로 매핑"), ("변동요인", "선택", "요인,항목,변동내역", ""),
                    ("BEL", "필수", "최선추정부채,최선추정", ""), ("RA", "필수", "위험조정", ""), ("CSM", "필수", "보험계약마진,계약서비스마진", "")], 3),
+    ("예산변경이력", [("부서코드", "필수", "부서,팀코드,조직코드", ""), ("부서명", "선택", "팀명,조직명", ""), ("예산계정", "필수", "G/L계정,계정,계정코드", ""),
+                    ("예산월", "필수", "월,예산기간,기간", "3 · 202603 · 2026-03 · 날짜 모두 가능"), ("예산금액", "선택", "배정액,예산", "참고용"),
+                    ("옮긴월", "선택", "이동월,변경월,옮긴기간", "비면 추가배정·반납으로 봄"), ("옮긴 금액", "필수", "옮긴금액,이동금액,변경금액,금액", ""),
+                    ("텍스트", "선택", "적요,사유,내용,비고", "'전용'·'반납' 구분 불가")], 1),
 ]
 FM = {}  # 시트별 블록 시작 행 (헤더설정 시트)
 r = 7
@@ -1733,8 +1802,9 @@ if os.environ.get("EMBED_JSON") and os.path.exists(os.environ["EMBED_JSON"]):
     for _i, _c in enumerate(_ch): _ws.cell(row=2 + _i, column=1, value=_c).number_format = "@"
     _ws.sheet_state = "hidden"
 order = ["안내", "설정", "헤더설정", "입력옵션", "자가진단", "대시보드", "IFRS17_사업비", "리포트", "주의대상", "원인분석", "변동분석", "계정변동", "월별집계", "차트데이터", "코멘트", "키워드사전",
-         "예산판_원본", "TB_원본", "전표_원본", "BS_원본", "PL_원본", "부채변동표", "예정사업비", "계정대체기준", "계정매핑", "부서매핑"]
+         "예산판_원본", "예산변경이력", "TB_원본", "전표_원본", "BS_원본", "PL_원본", "부채변동표", "예정사업비", "계정대체기준", "계정매핑", "부서매핑"]
 if "대시보드데이터" in wb.sheetnames: order.append("대시보드데이터")
+assert set(order) == set(wb.sheetnames), set(wb.sheetnames) ^ set(order)   # 새 시트를 순서 목록에 빠뜨리지 않게
 wb._sheets = [wb[n] for n in order]
 for w in wb.worksheets: w.sheet_view.showGridLines = False
 for n, colr in [("설정", "FFC000"), ("자가진단", "70AD47"), ("대시보드", "1F3864"), ("리포트", "1F3864"), ("BS_원본", "5B9BD5"), ("PL_원본", "5B9BD5"), ("부채변동표", "5B9BD5"), ("예정사업비", "5B9BD5"), ("IFRS17_사업비", "7030A0"), ("주의대상", "C00000"), ("원인분석", "C00000"),
@@ -1744,6 +1814,6 @@ wb.active = 3
 wb.calculation.fullCalcOnLoad = True
 wb.save(XLSX)
 
-json.dump(dict(E=[{**e, "date": e["date"].isoformat()} for e in E], BP=BP, KEYS=KEYS, bud_gl={f"{k[0]}|{k[1]}": v for k, v in bud_gl.items()},
+json.dump(dict(E=[{**e, "date": e["date"].isoformat()} for e in E], BH=[[d_, g_, list(fr), list(to) if to else None, amt, txt] for d_, g_, fr, to, amt, txt in BHIST], CM=[[x.isoformat() if isinstance(x, dt.date) else x for x in c_] for c_ in CMTS], BP=BP, KEYS=KEYS, bud_gl={f"{k[0]}|{k[1]}": v for k, v in bud_gl.items()},
                VA_PRE=VA_PRE, AT=AT, C0=C0, C1=C1, JE_END=JE_END, CD=CD_LAYOUT, BS=BSROWS, PL=PLROWS, FM=FM, ROLL=ROLL, EXP=EXPROWS, IF=IF_LAYOUT), open(os.path.join(HERE, "tool_data.json"), "w"), ensure_ascii=False)
 print("saved", XLSX, "entries", len(E), "TB", len(TB), "BP", len(BP), "keys", len(KEYS))

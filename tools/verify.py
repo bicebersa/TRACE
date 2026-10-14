@@ -84,6 +84,29 @@ def main():
         for col, f in (("C", "cur"), ("D", "prevYear"), ("F", "prevMonth"), ("G", "qCur"), ("H", "qPrev"), ("I", "ytd"), ("J", "ytdPrev")):
             x = g("차트데이터", f"{col}{r}")
             if not isinstance(x, float) or abs(x - a[f]) > 0.06: bad.append(f"차트데이터 계정 {a['gl']} {col}: {x} vs {a[f]}")
+    for i, t in enumerate(data["top10"]):   # 주의대상 예산 조정·조치 열
+        r = 6 + i
+        v = g("주의대상", f"AQ{r}")
+        if not isinstance(v, (int, float)) or abs(v - t["adjQ"]) > 0.06: bad.append(f"주의대상 {i + 1} AQ: {v} vs {t['adjQ']}")
+        for col, f in (("AR", "adjType"), ("AT", "lastAction")):
+            if (g("주의대상", f"{col}{r}") or "") != t[f]: bad.append(f"주의대상 {i + 1} {col}: {g('주의대상', f'{col}{r}')} vs {t[f]}")
+        v = g("주의대상", f"AS{r}")
+        if not isinstance(v, (int, float)) or int(v) != t["actCount"]: bad.append(f"주의대상 {i + 1} AS: {v} vs {t['actCount']}")
+    for i, b in enumerate(data["budgetHistory"]):   # 예산변경이력 보조수식
+        r = 5 + i
+        for col, f in (("J", "key"), ("M", "from"), ("N", "to"), ("Q", "type"), ("R", "move")):
+            if (g("예산변경이력", f"{col}{r}") or "") != (b[f] or ""): bad.append(f"예산변경이력 {r} {col}: {g('예산변경이력', f'{col}{r}')} vs {b[f]}")
+        for col, f in (("O", "fromAmt"), ("P", "amt")):
+            v = g("예산변경이력", f"{col}{r}")
+            if not isinstance(v, (int, float)) or abs(v - b[f]) > 0.06: bad.append(f"예산변경이력 {r} {col}: {v} vs {b[f]}")
+    BPD = json.load(open(os.path.join(SRC, "tool_data.json")))["BP"]
+    sys.path.insert(0, SRC)
+    for i, row in enumerate(BPD):   # 예산판 조정 추정·조치 기록
+        if row[7] == 0: continue
+        r = 5 + i
+        exp_t = G["adjtype"](row); rec = any(c[2] == row[1] and str(c[3]) == str(row[3]) and c[0] == row[0] and c[10] == row[5] and c[8] for c in G["CM"])
+        if g("예산판_원본", f"S{r}") != exp_t: bad.append(f"예산판 {r} S: {g('예산판_원본', f'S{r}')} vs {exp_t}")
+        if g("예산판_원본", f"T{r}") != ("기록됨" if rec else "기록 없음"): bad.append(f"예산판 {r} T: {g('예산판_원본', f'T{r}')} vs {rec}")
     for i, x_ in enumerate(data["expcat"]):   # 차트데이터 사업비 구성 (재무 요약)
         r = CDL["CDI"] + 1 + i
         for col, f in [(chr(66 + m), f"m{m + 1}") for m in range(12)] + [("N", "ytd"), ("P", "py"), ("Q", "diff")]:

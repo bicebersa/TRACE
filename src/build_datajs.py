@@ -17,8 +17,33 @@ KW = [("연간 일괄 계상", ["연간", "일시", "선급", "1년", "반기"],
       ("추정 계상", ["미지급", "추정", "선계상", "", ""], "월말 추정 계상분. 다음 달 역분개 여부 확인"),
       ("소급·정산", ["소급", "정산", "추가청구", "차액", ""], "과거분 정산·소급 지급일 가능성"),
       ("판매시책·추가수수료", ["시책", "추가 수수료", "인센티브", "특별수당", ""], "판매 시책비·추가 수수료. 신계약비 경험차이로 GMM CSM에 영향 가능")]
-COMMENTS = {"D500|62701000": "3분기 신상품 TV캠페인 집행을 앞당김. 4분기 집행분에서 조정 예정",
-            "D200|62901000": "8월 경영기획팀에 잘못 귀속된 회계자문료를 재분류. 실제 증가 아님"}
+CM = D["CM"]   # 코멘트 시트: 연도, 월, 부서, 계정, 원인 유형, 내용, 작성자, 작성일, 조치 구분, 조치 금액(원), 대상 분기, 상태, 근거
+COMMENTS = {f"{c[2]}|{c[3]}": c[5] for c in CM if (c[0], c[1]) == (2026, 9)}
+# 예산판 조정 추정 (예산판_원본 S열과 같은 규칙)
+def adjtype(r):
+    h = r[7]
+    if h == 0: return ""
+    if abs(sum(x[7] for x in BP if (x[1], x[3], x[0]) == (r[1], r[3], r[0]))) < 1: return "집행시기변경"
+    if any(x[0] == r[0] and x[5] == r[5] and x[7] == -h for x in BP): return "전용(받음)" if h > 0 else "전용(보냄)"
+    return "추가배정" if h > 0 else "감액·반납"
+ADJT = {(r[1], str(r[3]), r[0], r[5]): (r[7], adjtype(r)) for r in BP}
+def act_summary(c):
+    return f"{c[0]}-{c[1]:02d} {c[8]}" + (f" {c[9] / 1e6:,.1f}" if c[9] else "") + (f" ({c[11]})" if c[11] else "")
+actions = [dict(period=f"{c[0]}-{c[1]:02d}", key=f"{c[2]}|{c[3]}", cause=c[4], text=c[5], who=c[6], act=c[8] or None, amt=c[9] / 1e6 if c[9] else None,
+                q=c[10], status=c[11] or None, ref=c[12] or None) for c in CM]
+# 예산변경이력 (엑셀 예산변경이력 J~R열과 같음)
+def bh_row(b):
+    d_, g_, fr, to, amt, txt = b
+    k_, l_ = fr[0] * 12 + fr[1], (to[0] * 12 + to[1]) if to else None
+    if "전용" in txt: t = "전용"
+    elif "반납" in txt: t = "감액·반납"
+    elif l_ is None: t = "추가배정" if amt >= 0 else "감액·반납"
+    else: t = "금액 변경" if l_ == k_ else "집행시기변경"
+    mv = "" if l_ is None or l_ == k_ else ("연도 간" if (k_ - 1) // 12 != (l_ - 1) // 12 else ("분기 간" if ((k_ - 1) % 12) // 3 != ((l_ - 1) % 12) // 3 else "분기 내"))
+    lab = lambda p: f"{(p - 1) // 12}-{(p - 1) % 12 + 1:02d}"
+    return dict(key=f"{d_}|{g_}", dept=d_, deptName=DEPTS[d_], gl=g_, **{"from": lab(k_)}, to=lab(l_) if l_ else None,
+                fromAmt=D["bud_gl"].get(f"{d_}|{g_}", [0] * 12)[fr[1] - 1] / 1e6, amt=amt / 1e6, type=t, move=mv, text=txt)
+budgetHistory = [bh_row(b) for b in D["BH"]]
 for i, e in enumerate(E):
     e["row"] = 5 + i; e["p"] = e["y"] * 12 + e["m"]; e["key"] = CC2D[e["cc"]] + "|" + e["gl"]; e["v"] = e["amt"] / 1e6
 def tot(key, p0, p1): return sum(e["v"] for e in E if e["key"] == key and p0 <= e["p"] <= p1)
@@ -203,6 +228,11 @@ for i, k in enumerate(rank, 1):
                       annual=v["W"], signal=v["Z"] or None, score=v["AA"], comment=COMMENTS.get(k, "(미확인)"),
                       qcur=v["K"], qoq=v["M"], ytd=v["Q"], ytdRate=v["AY"], momAmt=v["F"] - v["G"], qoqAmt=v["K"] - v["L"], ytdAmt=v["Q"] - v["AX"], burn=bw,
                       cause=cause(k), causes={b: cause(k, b) for b in ("전분기", "전년동기누적")}))
+    d_, g_ = k.split("|"); qn = (M - 1) // 3 + 1
+    acts = [(c[0] * 12 + c[1] + (i + 5) / 100000, c) for i, c in enumerate(CM) if c[2] == d_ and c[3] == g_ and c[8]]
+    top10[-1].update(key=k, adjQ=ADJT.get((d_, g_, Y, qn), (0, ""))[0] / 1e6, adjType=ADJT.get((d_, g_, Y, qn), (0, ""))[1],
+                     actCount=sum(1 for c in CM if c[2] == d_ and c[3] == g_), lastAction=act_summary(max(acts)[1]) if acts else "",
+                     adj=[dict(q=q, amt=ADJT.get((d_, g_, Y, q), (0, ""))[0] / 1e6, type=ADJT.get((d_, g_, Y, q), (0, ""))[1]) for q in range(1, 5)])
 
 # ---------------- 차트데이터
 bs = {(r[0] * 12 + r[1], r[2]): r[6] / 1e6 for r in D["BS"]}
@@ -340,8 +370,11 @@ for i, nm in enumerate(EXPCAT + ["합계"]):
 for x in expcat: x["share"] = x["ytd"] / expcat[-1]["ytd"] if expcat[-1]["ytd"] else 0
 expcat = [{k: x[k] for k in ["cat"] + [f"m{m}" for m in range(1, 13)] + ["ytd", "share", "py", "diff", "rate"]} for x in expcat]
 
+PLANS_JSON = os.path.join(HERE, "plans.json")   # 연도별 예산 비교 예시 (build_plans.py) — 실제로는 대시보드에서 두 파일을 올림
+plans = json.load(open(PLANS_JSON, encoding="utf-8")) if os.path.exists(PLANS_JSON) else None
+
 data = dict(meta=dict(company=os.environ.get("COMPANY", "예시보험㈜"), period=plab(P), unit="백만원", burnMethod=BURN_METHOD, check="전체 정상 (참고 1건)", recon="전체 일치", generated="2026-10-14 (예시 데이터)"),
-            kpi=kpi, monthly=monthly, depts=depts, status=status, accounts=accounts, bs=bsrows, pl=plrows, expcat=expcat, burn=burnrows, top10=top10, ifrs17=ifrs17)
+            kpi=kpi, monthly=monthly, depts=depts, status=status, accounts=accounts, bs=bsrows, pl=plrows, expcat=expcat, budgetHistory=budgetHistory, actions=actions, plans=plans, burn=burnrows, top10=top10, ifrs17=ifrs17)
 def rnd(o):
     if isinstance(o, float): return round(o, 4)
     if isinstance(o, dict): return {k: rnd(v) for k, v in o.items()}

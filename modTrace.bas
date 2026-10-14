@@ -15,7 +15,8 @@ Public Sub FillAllHelpers()
     Application.Calculation = xlCalculationManual
     FillHelpers UHex("C804D45C005FC6D0BCF8"), 13, 34
     FillHelpers UHex("00540042005FC6D0BCF8"), 9, 11
-    FillHelpers UHex("C608C0B0D310005FC6D0BCF8"), 12, 18
+    FillHelpers UHex("C608C0B0D310005FC6D0BCF8"), 12, 21
+    FillHelpers UHex("C608C0B0BCC0ACBDC774B825"), 10, 18
     FillHelpers UHex("00420053005FC6D0BCF8"), 9, 11
     FillHelpers UHex("0050004C005FC6D0BCF8"), 10, 13
     FillHelpers UHex("C608C815C0ACC5C5BE44"), 9, 12
@@ -56,6 +57,8 @@ Public Sub ExportDashboard()
     js = js & """accounts"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 38, 19, Array("gl", "name", "cur", "prevYear", "diff", "prevMonth", "qCur", "qPrev", "ytd", "ytdPrev")) & "," & vbLf
     js = js & """bs"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 61, 12, Array("p", "period", "assets", "liabilities", "equity", "csm", "invested")) & "," & vbLf
     js = js & """pl"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 76, 12, Array("month", "niCur", "niPrev", "insCur", "invCur", "expCur", "insPrev")) & "," & vbLf
+    js = js & """budgetHistory"": " & BudgetHistoryJson() & "," & vbLf
+    js = js & """actions"": " & ActionsJson() & "," & vbLf
     js = js & """expcat"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 120, 8, Array("cat", "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12", "ytd", "share", "py", "diff", "rate")) & "," & vbLf
     js = js & """burn"": " & RowsJson(UHex("CC28D2B8B370C774D130"), 101, 16, Array("rank", "dept", "account", "budget", "ytd", "slope", "icpt", "yearEnd", "tstar", "date", "status", "qdate", _
         "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11", "c12", "row", "qlim", "qact", "pySlope")) & "," & vbLf
@@ -148,7 +151,7 @@ Private Function TopItemJson(ByVal k As Long, ByVal causeJs As String, ByVal cau
     Dim w As Worksheet, s As String, wr As Long, j As Long, bk As Variant
     Set w = ThisWorkbook.Worksheets(UHex("C8FCC758B300C0C1"))
     wr = 5 + k
-    s = "{""rank"": " & k & ", ""dept"": " & JV(w.Cells(wr, 2).Value) & ", ""account"": " & JV(w.Cells(wr, 3).Value) & _
+    s = "{""rank"": " & k & ", ""key"": " & JV(w.Cells(wr, 12).Value) & ", ""dept"": " & JV(w.Cells(wr, 2).Value) & ", ""account"": " & JV(w.Cells(wr, 3).Value) & _
         ", ""cur"": " & JV(w.Cells(wr, 4).Value) & ", ""mom"": " & JV(w.Cells(wr, 5).Value) & ", ""yoy"": " & JV(w.Cells(wr, 6).Value) & _
         ", ""status"": " & JV(w.Cells(wr, 7).Value) & ", ""qrate"": " & JV(w.Cells(wr, 8).Value) & ", ""annual"": " & JV(w.Cells(wr, 9).Value) & _
         ", ""signal"": " & JV(w.Cells(wr, 10).Value) & ", ""score"": " & JV(w.Cells(wr, 11).Value) & ", ""comment"": " & JV(w.Cells(wr, 13).Value) & _
@@ -164,8 +167,95 @@ Private Function TopItemJson(ByVal k As Long, ByVal causeJs As String, ByVal cau
         s = s & ", ""c" & j & """: " & JV(w.Cells(wr, 26 + j).Value)
     Next j
     s = s & ", ""pySlope"": " & JV(w.Cells(wr, 39).Value)
-    TopItemJson = s & "}, ""cause"": " & causeJs & ", ""causes"": " & causesJs & "}"
+    s = s & "}, ""adjQ"": " & JV(w.Cells(wr, 43).Value) & ", ""adjType"": " & JV(w.Cells(wr, 44).Value) & ", ""actCount"": " & JV(w.Cells(wr, 45).Value) & _
+        ", ""lastAction"": " & JV(w.Cells(wr, 46).Value) & ", ""adj"": " & AdjJson(CStr(w.Cells(wr, 12).Value))
+    TopItemJson = s & ", ""cause"": " & causeJs & ", ""causes"": " & causesJs & "}"
 End Function
+
+' 예산판 분기별 조정 (부서|계정 키, 기준연도) → [{q, amt, type}]
+Private Function AdjJson(ByVal key As String) As String
+    Dim bp As Worksheet, q As Long, k3 As String, m As Variant, s As String, fx As Double
+    Set bp = ThisWorkbook.Worksheets(UHex("C608C0B0D310005FC6D0BCF8"))
+    fx = ThisWorkbook.Worksheets(UHex("C124C815")).Range("C23").Value
+    s = "["
+    For q = 1 To 4
+        k3 = key & "|" & ThisWorkbook.Worksheets(UHex("C124C815")).Range("C6").Value & "|" & q
+        m = Application.Match(k3, bp.Range("U5:U5000"), 0)
+        s = s & IIf(q > 1, ", ", "") & "{""q"": " & q & ", ""amt"": " & JV(Application.WorksheetFunction.SumIfs(bp.Range("H5:H5000"), bp.Range("U5:U5000"), k3) * fx) & _
+            ", ""type"": " & IIf(IsError(m), """""", JV(CStr(bp.Cells(4 + IIf(IsError(m), 1, m), 19).Value))) & "}"
+    Next q
+    AdjJson = s & "]"
+End Function
+
+' 예산변경이력 시트 (보조수식 J~R 포함) → 대시보드 예산변동 히스토리
+Private Function BudgetHistoryJson() As String
+    Dim ws As Worksheet, r As Long, last As Long, s As String, n As Long
+    Set ws = ThisWorkbook.Worksheets(UHex("C608C0B0BCC0ACBDC774B825"))
+    last = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    s = "["
+    For r = 5 To last
+        If CStr(ws.Cells(r, 1).Value) <> "" Then
+            s = s & IIf(n > 0, ", ", "") & "{""key"": " & JV(ws.Cells(r, 10).Value) & ", ""dept"": " & JV(CStr(ws.Cells(r, 1).Value)) & ", ""deptName"": " & JV(ws.Cells(r, 2).Value) & _
+                ", ""gl"": " & JV(CStr(ws.Cells(r, 3).Value)) & ", ""from"": " & JV(ws.Cells(r, 13).Value) & ", ""to"": " & JV(ws.Cells(r, 14).Value) & _
+                ", ""fromAmt"": " & JV(ws.Cells(r, 15).Value) & ", ""amt"": " & JV(ws.Cells(r, 16).Value) & ", ""type"": " & JV(ws.Cells(r, 17).Value) & _
+                ", ""move"": " & JV(ws.Cells(r, 18).Value) & ", ""text"": " & JV(ws.Cells(r, 8).Value) & "}"
+            n = n + 1
+        End If
+    Next r
+    BudgetHistoryJson = s & "]"
+End Function
+
+' 코멘트 시트 (확인된 원인·조치 이력) → 대시보드
+Private Function ActionsJson() As String
+    Dim ws As Worksheet, r As Long, last As Long, s As String, n As Long, fx As Double, a As Variant
+    Set ws = ThisWorkbook.Worksheets(UHex("CF54BA58D2B8"))
+    fx = ThisWorkbook.Worksheets(UHex("C124C815")).Range("C23").Value
+    last = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    s = "["
+    For r = 5 To last
+        If CStr(ws.Cells(r, 1).Value) <> "" Then
+            a = ws.Cells(r, 11).Value
+            If IsEmpty(a) Or a = "" Then a = Empty Else a = a * fx
+            s = s & IIf(n > 0, ", ", "") & "{""period"": " & JV(Format(ws.Cells(r, 1).Value, "0") & "-" & Format(ws.Cells(r, 2).Value, "00")) & ", ""key"": " & JV(ws.Cells(r, 16).Value) & _
+                ", ""cause"": " & JV(ws.Cells(r, 5).Value) & ", ""text"": " & JV(ws.Cells(r, 6).Value) & ", ""who"": " & JV(ws.Cells(r, 7).Value) & _
+                ", ""act"": " & JV(ws.Cells(r, 10).Value) & ", ""amt"": " & JV(a) & ", ""q"": " & JV(ws.Cells(r, 12).Value) & _
+                ", ""status"": " & JV(ws.Cells(r, 13).Value) & ", ""ref"": " & JV(ws.Cells(r, 14).Value) & "}"
+            n = n + 1
+        End If
+    Next r
+    ActionsJson = s & "]"
+End Function
+
+' 예산판 조정 중 코멘트 시트에 조치가 없는 행을 '조치 이력'으로 옮겨 적음 (매월 예산판 불러온 뒤 실행)
+Public Sub RecordAdjustments()
+    Dim bp As Worksheet, cm As Worksheet, st As Worksheet, r As Long, last As Long, nr As Long, n As Long
+    Set bp = ThisWorkbook.Worksheets(UHex("C608C0B0D310005FC6D0BCF8")): Set cm = ThisWorkbook.Worksheets(UHex("CF54BA58D2B8")): Set st = ThisWorkbook.Worksheets(UHex("C124C815"))
+    Application.Calculate
+    last = bp.Cells(bp.Rows.Count, 1).End(xlUp).Row
+    nr = cm.Cells(cm.Rows.Count, 1).End(xlUp).Row + 1
+    If nr < 5 Then nr = 5
+    For r = 5 To last
+        If CStr(bp.Cells(r, 20).Value) = UHex("AE30B85D0020C5C6C74C") Then
+            cm.Cells(nr, 1).Value = bp.Cells(r, 13).Value
+            cm.Cells(nr, 2).Value = st.Range("C7").Value
+            cm.Cells(nr, 3).Value = CStr(bp.Cells(r, 2).Value)
+            cm.Cells(nr, 4).NumberFormat = "@"
+            cm.Cells(nr, 4).Value = CStr(bp.Cells(r, 4).Value)
+            cm.Cells(nr, 5).Value = UHex("C608C0B00020C870C815")
+            cm.Cells(nr, 6).Value = UHex("C608C0B0D3100020C870C8150020C790B3D90020AE30B85D00200028") & CStr(bp.Cells(r, 19).Value) & ")"
+            cm.Cells(nr, 7).Value = "TRACE"
+            cm.Cells(nr, 8).Value = Date
+            cm.Cells(nr, 10).Value = CStr(bp.Cells(r, 19).Value)
+            cm.Cells(nr, 11).Value = bp.Cells(r, 8).Value
+            cm.Cells(nr, 12).Value = bp.Cells(r, 14).Value
+            cm.Cells(nr, 13).Value = UHex("C2B9C778")
+            cm.Cells(nr, 14).Value = UHex("C608C0B0D310")
+            nr = nr + 1: n = n + 1
+        End If
+    Next r
+    Application.Calculate
+    MsgBox UHex("C608C0B0D3100020C870C8150020") & n & UHex("AC74C7440020CF54BA58D2B80020C2DCD2B80028C870CE580020C774B8250029C5D00020AE30B85DD588C2B5B2C8B2E4002E") & vbLf & UHex("AD6CBD8400B7C0C1D0DC00B7ADFCAC70B97C0020D655C778D5740020ACE0CCD00020C8FCC138C694002E"), vbInformation, "TRACE"
+End Sub
 
 ' 원인분석 시트의 지금 계산 결과 (선택 항목 · 비교 기준 하나)
 Private Function CauseJson(ByVal ca As Worksheet) As String
@@ -288,7 +378,10 @@ End Function
 
 ' ---------------------------------------------------------------- 불러오기 (헤더설정 시트의 헤더 이름으로 열을 찾음)
 Public Sub ImportBudget()
-    ImportSource UHex("C608C0B0D310005FC6D0BCF8"), 9, 10, 2, 12, 18
+    ImportSource UHex("C608C0B0D310005FC6D0BCF8"), 9, 10, 2, 12, 21
+End Sub
+Public Sub ImportBudgetHistory()
+    ImportSource UHex("C608C0B0BCC0ACBDC774B825"), 97, 8, 1, 10, 18
 End Sub
 Public Sub ImportTB()
     ImportSource UHex("00540042005FC6D0BCF8"), 23, 7, 3, 9, 11
@@ -600,16 +693,16 @@ End Sub
 
 ' TRACE_v0.5.xlsm을 열 때 ThisWorkbook.Workbook_Open이 부릅니다. 버튼이 없을 때만 조용히 만듭니다.
 Public Sub EnsureButtons()
-    If ThisWorkbook.Worksheets(UHex("C124C815")).Buttons.Count = 0 Then MakeButtons False
+    If ThisWorkbook.Worksheets(UHex("C124C815")).Buttons.Count < 12 Then MakeButtons False
 End Sub
 
 Private Sub MakeButtons(ByVal announce As Boolean)
     Dim ws As Worksheet, b As Object, specs As Variant, i As Long, t As Double, l As Double
     Set ws = ThisWorkbook.Worksheets(UHex("C124C815"))
     For Each b In ws.Buttons: b.Delete: Next b
-    specs = Array(UHex("C608C0B0D3100020BD88B7ECC624AE30"), "ImportBudget", UHex("005400420020BD88B7ECC624AE30"), "ImportTB", UHex("C804D45C0020BD88B7ECC624AE30"), "ImportJournal", UHex("004200530020BD88B7ECC624AE30"), "ImportBS", UHex("0050004C0020BD88B7ECC624AE30"), "ImportPL", _
+    specs = Array(UHex("C608C0B0D3100020BD88B7ECC624AE30"), "ImportBudget", UHex("C608C0B0BCC0ACBDC774B8250020BD88B7ECC624AE30"), "ImportBudgetHistory", UHex("005400420020BD88B7ECC624AE30"), "ImportTB", UHex("C804D45C0020BD88B7ECC624AE30"), "ImportJournal", UHex("004200530020BD88B7ECC624AE30"), "ImportBS", UHex("0050004C0020BD88B7ECC624AE30"), "ImportPL", _
                   UHex("C608C815C0ACC5C5BE440020BD88B7ECC624AE30"), "ImportExpected", UHex("BD80CC44BCC0B3D9D45C0020BD88B7ECC624AE30"), "ImportRoll", _
-                  UHex("BCF4C870C218C2DD0020B2E4C2DC0020CC44C6B0AE30"), "FillAllHelpers", UHex("B300C2DCBCF4B4DC0020B0B4BCF4B0B4AE30002000280064006100740061002E006A00730029"), "ExportDashboard", UHex("B9ACD3ECD2B80020005000440046"), "ExportReportPdf")
+                  UHex("BCF4C870C218C2DD0020B2E4C2DC0020CC44C6B0AE30"), "FillAllHelpers", UHex("C608C0B00020C870C815002021920020C870CE580020C774B8250020AE30B85D"), "RecordAdjustments", UHex("B300C2DCBCF4B4DC0020B0B4BCF4B0B4AE30002000280064006100740061002E006A00730029"), "ExportDashboard", UHex("B9ACD3ECD2B80020005000440046"), "ExportReportPdf")
     l = ws.Range("I5").Left: t = ws.Range("I5").Top
     ws.Range("I4").Value = UHex("B9E4D06CB85C0020BC84D2BC")
     For i = 0 To UBound(specs) Step 2
@@ -618,5 +711,5 @@ Private Sub MakeButtons(ByVal announce As Boolean)
         b.OnAction = specs(i + 1)
         t = t + 32
     Next i
-    If announce Then MsgBox UHex("BC84D2BC002000310030AC1CB97C0020B9CCB4E4C5C8C2B5B2C8B2E4002E0020D30CC77C0020D615C2DDC744002000270045007800630065006C0020B9E4D06CB85C0020C0ACC6A90020D1B5D5690020BB38C11C0028002A002E0078006C0073006D00290027B85C0020C800C7A5D558C138C694002E"), vbInformation, "TRACE"
+    If announce Then MsgBox UHex("BC84D2BC002000310032AC1CB97C0020B9CCB4E4C5C8C2B5B2C8B2E4002E0020D30CC77C0020D615C2DDC744002000270045007800630065006C0020B9E4D06CB85C0020C0ACC6A90020D1B5D5690020BB38C11C0028002A002E0078006C0073006D00290027B85C0020C800C7A5D558C138C694002E"), vbInformation, "TRACE"
 End Sub
