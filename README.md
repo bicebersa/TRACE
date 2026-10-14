@@ -21,8 +21,10 @@ SAP 예산판·시산표(TB)·전표와 감독원 양식 BS·PL·보험계약부
 | `TRACE_v0.5.xlsx` | 본체. 입력 시트 7종, 헤더설정·입력옵션, 계정대체기준, 자가진단(33항목), 변동분석(분기 한도), 주의대상, 원인분석, IFRS17_사업비, 리포트, 대시보드 |
 | `modTrace.bas` | VBA 모듈 (CP949). 헤더 이름 불러오기 7종, 감독원 가로 양식 합치기, 대시보드 내보내기(data.js + 숨김 시트), 리포트 PDF |
 | `TRACE_대시보드.html` + `data.js` | HTML 대시보드. 상단 메뉴, 탭 5개, 엑셀(.xlsx·.xlsm)·data.js 업로드. 외부 리소스 없음 |
-| `TRACE_흐름.html` · `TRACE_IFRS17_연결.html` · `TRACE_사용설명서.html` | 처리 흐름, IFRS 17 연결 흐름, 사용설명서 (상단 메뉴로 연결) |
+| `TRACE_흐름.html` · `TRACE_IFRS17_연결.html` · `TRACE_사용설명서.html` · `TRACE_내려받기.html` | 처리 흐름, IFRS 17 연결 흐름, 사용설명서, 엑셀 양식·파일 내려받기 (상단 메뉴로 연결) |
 | `index.html` + `api/chat.js` | TRACE 도우미 챗봇 (Vercel 배포용, OpenRouter 무료 Nemotron). 외부망 전용 |
+| `TRACE_v0.5_전체.zip` | 내부망 반입용 전체 묶음 (본체·매크로·HTML·data.js·양식) |
+| `samples/TRACE_입력양식_v0.5.xlsx` | 입력 양식 7종: 불러오기가 찾는 머리글(노란 = 필수) + 예시 3행 |
 | `samples/샘플_감독원양식_2026-09.xlsx` | 예시 감독원 양식 (재무상태표·손익계산서·보험계약부채 변동표, 가로형) |
 | `docs/` | 사용설명서, 입력 양식 바꾸는 법, 프로젝트 정의, 작업 이력 |
 | `CLAUDE.md` | 이어서 작업할 때 읽는 프로젝트 안내 (환경 제약, 구조, 빌드·검증, 남은 일) |
@@ -122,6 +124,8 @@ python src/build_datajs.py                      # data.js (엑셀 수식과 같�
 EMBED_JSON=data.js python src/build_trace.py    # 결과 내장본 (엑셀만 올려도 대시보드가 읽음)
 python src/build_vba.py                         # modTrace.bas
 python src/build_sample_fss.py                  # samples/샘플_감독원양식_2026-09.xlsx
+python src/build_forms.py                       # samples/TRACE_입력양식_v0.5.xlsx (본체 헤더설정에서 생성)
+python src/build_bundle.py                      # TRACE_v0.5_전체.zip (내려받기 페이지용 전체 묶음)
 python tools/verify.py                          # 수식 검증 (10분 안팎)
 ```
 
