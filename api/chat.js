@@ -87,7 +87,8 @@ export async function POST(request) {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) {
     // 연동이 다른 이름으로 키를 넣었거나 환경(Preview/Production) 범위가 다를 때 원인을 바로 보이게 한다. 값은 내보내지 않는다.
-    const similar = Object.keys(process.env).filter((k) => /openrouter/i.test(k));
+    // OPNEROUTER처럼 철자가 바뀐 이름도 잡도록 'ROUTER'로 찾는다
+    const similar = Object.keys(process.env).filter((k) => /router/i.test(k));
     return json({
       error:
         `이 배포(${process.env.VERCEL_ENV || '알 수 없음'} 환경)에 환경변수 OPENROUTER_API_KEY가 없습니다. ` +
